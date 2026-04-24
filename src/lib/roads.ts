@@ -6,7 +6,9 @@ export type RoadKind =
   | "chauraha"
   | "roundabout"
   | "bridge"
-  | "flyover";
+  | "flyover"
+  | "flyover_straight"
+  | "flyover_curve";
 
 export type Dir = 0 | 1 | 2 | 3;
 export const DIRS: Dir[] = [0, 1, 2, 3];
@@ -37,11 +39,14 @@ export const ROADS: Record<RoadKind, RoadDef> = {
   chauraha:   { kind: "chauraha",   label: "Chauraha (4-way)",hindi: "Chauraha",      base: [true, true, true, true],    rotatable: false },
   roundabout: { kind: "roundabout", label: "Roundabout",    hindi: "Gol Chakkar",     base: [true, true, true, true],    rotatable: false },
   bridge:     { kind: "bridge",     label: "Bridge",        hindi: "Pul",             base: [true, false, true, false],  rotatable: true, elevated: true },
-  flyover:    { kind: "flyover",    label: "Flyover",       hindi: "Uparigami Pul",   base: [true, true, true, true],    rotatable: true, elevated: true },
+  flyover:    { kind: "flyover",    label: "Flyover Cross", hindi: "Uparigami Pul",   base: [true, true, true, true],    rotatable: true, elevated: true },
+  flyover_straight: { kind: "flyover_straight", label: "Flyover Ramp", hindi: "Uparigami Sadak", base: [true, false, true, false], rotatable: true, elevated: true },
+  flyover_curve:    { kind: "flyover_curve",    label: "Flyover Curve",hindi: "Uparigami Mod",   base: [true, true, false, false], rotatable: true, elevated: true },
 };
 
 export const ROAD_ORDER: RoadKind[] = [
-  "straight","curve","tiraha","chauraha","roundabout","deadend","bridge","flyover",
+  "straight","curve","tiraha","chauraha","roundabout","deadend","bridge",
+  "flyover","flyover_straight","flyover_curve",
 ];
 
 export function rotatedConnectors(kind: RoadKind, rot: 0 | 1 | 2 | 3): Connectors {

@@ -185,6 +185,43 @@ export function RoadSvg({ kind }: { kind: RoadKind }) {
           <line x1={H} y1={5} x2={H} y2={S - 5} stroke={STRIPE} strokeWidth={2.4} strokeDasharray={DASH} strokeLinecap="round" />
         </g>
       );
+
+    case "flyover_straight":
+      return (
+        <g>
+          <ellipse cx={H - W / 2 - 6} cy={10} rx={5} ry={2} fill={FLYOVER_SHADOW} />
+          <ellipse cx={H + W / 2 + 6} cy={10} rx={5} ry={2} fill={FLYOVER_SHADOW} />
+          <ellipse cx={H - W / 2 - 6} cy={S - 10} rx={5} ry={2} fill={FLYOVER_SHADOW} />
+          <ellipse cx={H + W / 2 + 6} cy={S - 10} rx={5} ry={2} fill={FLYOVER_SHADOW} />
+          <rect x={H - W / 2 - 5} y={-2} width={W + 10} height={S + 4} fill={FLYOVER_DECK} stroke={EDGE} strokeWidth={STROKE} rx={5} />
+          <rect x={H - W / 2 - 5} y={-2} width={W + 10} height={5} fill={FLYOVER_DECK_EDGE} opacity={0.8} rx={5} />
+          <rect x={H - W / 2 + 1} y={0} width={W - 2} height={S} fill={ROAD} rx={1} />
+          <rect x={H - W / 2 + 2} y={0} width={1} height={S} fill={CURB} opacity={0.5} />
+          <rect x={H + W / 2 - 3} y={0} width={1} height={S} fill={CURB} opacity={0.5} />
+          <line x1={H} y1={6} x2={H} y2={S - 6} stroke={STRIPE} strokeWidth={2.4} strokeDasharray={DASH} strokeLinecap="round" />
+        </g>
+      );
+
+    case "flyover_curve": {
+      const rMid = H;
+      const rOut = H + W / 2 + 5;
+      const rIn = H - W / 2 - 5;
+      const rRoadOut = H + W / 2;
+      const rRoadIn = H - W / 2;
+      return (
+        <g>
+          <path d={`M ${H} -2 A ${rMid} ${rMid} 0 0 0 ${S + 2} ${H}`} stroke={FLYOVER_SHADOW} strokeWidth={W + 14} fill="none" transform="translate(0 3)" opacity={0.35} />
+          <path d={`M ${H} -2 A ${rMid} ${rMid} 0 0 0 ${S + 2} ${H}`} stroke={FLYOVER_DECK} strokeWidth={W + 10} fill="none" />
+          <path d={`M ${H - W / 2 - 5} 0 A ${rOut} ${rOut} 0 0 0 ${S} ${H + W / 2 + 5}`} stroke={EDGE} strokeWidth={STROKE} fill="none" />
+          <path d={`M ${H + W / 2 + 5} 0 A ${rIn} ${rIn} 0 0 0 ${S} ${H - W / 2 - 5}`} stroke={EDGE} strokeWidth={STROKE} fill="none" />
+          <path d={`M ${H - W / 2 - 5} 0 A ${rOut} ${rOut} 0 0 0 ${S} ${H + W / 2 + 5}`} stroke={FLYOVER_DECK_EDGE} strokeWidth={2} fill="none" opacity={0.7} />
+          <path d={`M ${H} 0 A ${rMid} ${rMid} 0 0 0 ${S} ${H}`} stroke={ROAD} strokeWidth={W - 2} fill="none" strokeLinecap="butt" />
+          <path d={`M ${H - W / 2} 0 A ${rRoadOut} ${rRoadOut} 0 0 0 ${S} ${H + W / 2}`} stroke={EDGE} strokeWidth={1} fill="none" opacity={0.5} />
+          <path d={`M ${H + W / 2} 0 A ${rRoadIn} ${rRoadIn} 0 0 0 ${S} ${H - W / 2}`} stroke={EDGE} strokeWidth={1} fill="none" opacity={0.5} />
+          <path d={`M ${H} 6 A ${rMid - 6} ${rMid - 6} 0 0 0 ${S - 6} ${H}`} stroke={STRIPE} strokeWidth={2.2} fill="none" strokeDasharray={DASH} strokeLinecap="round" />
+        </g>
+      );
+    }
   }
 }
 
