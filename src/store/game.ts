@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import { cellKey, type GridMap, type Rot, type Tile } from "@/lib/grid";
+import { cellKey, evalTile, type GridMap, type Rot, type Tile } from "@/lib/grid";
 import type { RoadKind } from "@/lib/roads";
 
 export type Feedback = { x: number; y: number; kind: "ok" | "bad"; at: number } | null;
@@ -31,7 +31,9 @@ export const useGame = create<State>((set, get) => ({
     const next = new Map(grid);
     const tile: Tile = { kind: selected, rot };
     next.set(cellKey(x, y), tile);
-    set({ grid: next, feedback: { x, y, kind: "ok", at: Date.now() } });
+    const ev = evalTile(next, x, y);
+    const kind = ev.mismatched > 0 ? "bad" : "ok";
+    set({ grid: next, feedback: { x, y, kind, at: Date.now() } });
   },
   removeTile: (x, y) => {
     const next = new Map(get().grid);
@@ -44,7 +46,9 @@ export const useGame = create<State>((set, get) => ({
     if (!t) return;
     const next = new Map(grid);
     next.set(cellKey(x, y), { ...t, rot: (((t.rot + 1) % 4) as Rot) });
-    set({ grid: next, feedback: { x, y, kind: "ok", at: Date.now() } });
+    const ev = evalTile(next, x, y);
+    const kind = ev.mismatched > 0 ? "bad" : "ok";
+    set({ grid: next, feedback: { x, y, kind, at: Date.now() } });
   },
   clearAll: () => set({ grid: new Map() }),
 }));

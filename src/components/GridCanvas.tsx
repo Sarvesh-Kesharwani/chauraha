@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/store/game";
-import { cellKey, evalTile, parseKey } from "@/lib/grid";
+import { cellKey, parseKey } from "@/lib/grid";
 import { RoadTile, TILE_SIZE } from "./RoadTile";
 
 const GRID_COLS = 18;
@@ -31,15 +31,6 @@ export function GridCanvas() {
     return () => window.removeEventListener("keydown", onKey);
   }, [hover, grid, rotateTile, cycleRot]);
 
-  const evals = useMemo(() => {
-    const m = new Map<string, ReturnType<typeof evalTile>>();
-    for (const [k] of grid) {
-      const [x, y] = parseKey(k);
-      m.set(k, evalTile(grid, x, y));
-    }
-    return m;
-  }, [grid]);
-
   const width = GRID_COLS * TILE_SIZE;
   const height = GRID_ROWS * TILE_SIZE;
 
@@ -56,8 +47,13 @@ export function GridCanvas() {
   return (
     <div
       ref={ref}
-      className="grid-bg relative rounded-xl2 shadow-pop bg-asphalt-50 border-2 border-asphalt-200 overflow-hidden no-select"
-      style={{ width, height, backgroundSize: `${TILE_SIZE}px ${TILE_SIZE}px` }}
+      className="relative rounded-xl2 shadow-pop border-[3px] border-asphalt-900/80 overflow-hidden no-select"
+      style={{
+        width,
+        height,
+        background:
+          "radial-gradient(ellipse at 30% 20%, #DCFCE7 0%, #BBF7D0 60%, #86EFAC 100%)",
+      }}
       onMouseMove={(e) => setHover(cellAt(e.clientX, e.clientY))}
       onMouseLeave={() => setHover(null)}
       onClick={(e) => {
@@ -84,18 +80,16 @@ export function GridCanvas() {
     >
       {[...grid.entries()].map(([k, t]) => {
         const [x, y] = parseKey(k);
-        const ev = evals.get(k);
-        const anyOk = ev && Object.values(ev.connectedSides).some(Boolean);
-        const bad = ev && ev.mismatched > 0;
-        const outline = bad ? "bad" : anyOk ? "ok" : null;
-        const pulse = feedback && feedback.x === x && feedback.y === y && feedback.kind === "ok";
+        const fresh = feedback && feedback.x === x && feedback.y === y;
+        const pulse = fresh && feedback.kind === "ok";
+        const shake = fresh && feedback.kind === "bad";
         return (
           <div
             key={k}
-            className={`absolute transition-transform ${pulse ? "animate-pulseJoin" : ""} ${bad ? "animate-shake" : ""}`}
+            className={`absolute ${pulse ? "animate-pulseJoin" : ""} ${shake ? "animate-shake" : ""}`}
             style={{ left: x * TILE_SIZE, top: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
           >
-            <RoadTile kind={t.kind} rot={t.rot} outline={outline} />
+            <RoadTile kind={t.kind} rot={t.rot} outline={null} />
           </div>
         );
       })}

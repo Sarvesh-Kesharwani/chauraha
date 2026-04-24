@@ -10,4 +10,6 @@ next-env.d.ts
 .DS_Store
 .history
 .lh
+.devserver.out.log
+.devserver.err.log
 
