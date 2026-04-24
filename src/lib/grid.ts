@@ -1,7 +1,10 @@
 import { DIR_DELTA, DIRS, OPPOSITE, hasConnector, type Dir, type RoadKind, ROADS } from "./roads";
+import type { BuildingKind } from "./buildings";
 
 export type Rot = 0 | 1 | 2 | 3;
-export type Tile = { kind: RoadKind; rot: Rot };
+export type RoadTileData = { type: "road"; kind: RoadKind; rot: Rot };
+export type BuildingTileData = { type: "building"; kind: BuildingKind; rot: Rot };
+export type Tile = RoadTileData | BuildingTileData;
 export type GridMap = Map<string, Tile>;
 
 export const cellKey = (x: number, y: number) => `${x},${y}`;
@@ -20,11 +23,16 @@ export function evalTile(grid: GridMap, x: number, y: number): ConnectionResult 
   const tile = grid.get(cellKey(x, y));
   const res: ConnectionResult = { connectedSides: { 0: false, 1: false, 2: false, 3: false }, openEnds: 0, mismatched: 0 };
   if (!tile) return res;
+  if (tile.type !== "road") return res;
   for (const d of DIRS) {
     if (!hasConnector(tile.kind, tile.rot, d)) continue;
     const { dx, dy } = DIR_DELTA[d];
     const neighbor = grid.get(cellKey(x + dx, y + dy));
     if (!neighbor) {
+      res.openEnds++;
+      continue;
+    }
+    if (neighbor.type !== "road") {
       res.openEnds++;
       continue;
     }
@@ -38,6 +46,8 @@ export function evalTile(grid: GridMap, x: number, y: number): ConnectionResult 
 
 export type ScoreBreakdown = {
   tiles: number;
+  roads: number;
+  buildings: number;
   connectedTiles: number;
   openEnds: number;
   mismatched: number;
@@ -52,6 +62,7 @@ export function scoreGrid(grid: GridMap): ScoreBreakdown {
   let mis = 0;
   const kinds = new Set<RoadKind>();
   for (const [k, t] of grid) {
+    if (t.type !== "road") continue;
     const [x, y] = parseKey(k);
     const ev = evalTile(grid, x, y);
     if (Object.values(ev.connectedSides).some(Boolean)) connected++;
@@ -61,9 +72,11 @@ export function scoreGrid(grid: GridMap): ScoreBreakdown {
   }
   const loops = countLoops(grid);
   const diversity = kinds.size;
+  const roads = [...grid.values()].filter((t) => t.type === "road").length;
+  const buildings = grid.size - roads;
   const bonusDiversity = diversity * 10;
-  const total = connected * 20 + loops * 50 + bonusDiversity - mis * 15 - open * 2;
-  return { tiles: grid.size, connectedTiles: connected, openEnds: open, mismatched: mis, loops, bonusDiversity, total: Math.max(0, total) };
+  const total = connected * 20 + loops * 50 + bonusDiversity + buildings * 3 - mis * 15 - open * 2;
+  return { tiles: grid.size, roads, buildings, connectedTiles: connected, openEnds: open, mismatched: mis, loops, bonusDiversity, total: Math.max(0, total) };
 }
 
 function countLoops(grid: GridMap): number {
@@ -71,6 +84,10 @@ function countLoops(grid: GridMap): number {
   let loops = 0;
   for (const k of grid.keys()) {
     if (visited.has(k)) continue;
+    if (grid.get(k)?.type !== "road") {
+      visited.add(k);
+      continue;
+    }
     const { nodes, edges } = bfsComponent(grid, k, visited);
     if (edges >= nodes && nodes >= 3) loops += edges - nodes + 1;
   }
@@ -88,12 +105,14 @@ function bfsComponent(grid: GridMap, start: string, visited: Set<string>) {
     nodes++;
     const [x, y] = parseKey(cur);
     const t = grid.get(cur)!;
+    if (t.type !== "road") continue;
     for (const d of DIRS) {
       if (!hasConnector(t.kind, t.rot, d)) continue;
       const { dx, dy } = DIR_DELTA[d];
       const nk = cellKey(x + dx, y + dy);
       const n = grid.get(nk);
       if (!n) continue;
+      if (n.type !== "road") continue;
       if (!hasConnector(n.kind, n.rot, OPPOSITE[d])) continue;
       edges++;
       if (!visited.has(nk)) queue.push(nk);

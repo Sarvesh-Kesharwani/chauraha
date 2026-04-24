@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/store/game";
 import { cellKey, parseKey } from "@/lib/grid";
+import { BuildingTile } from "./BuildingTile";
 import { RoadTile, TILE_SIZE } from "./RoadTile";
 
 const GRID_COLS = 18;
@@ -89,7 +90,11 @@ export function GridCanvas() {
             className={`absolute ${pulse ? "animate-pulseJoin" : ""} ${shake ? "animate-shake" : ""}`}
             style={{ left: x * TILE_SIZE, top: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
           >
-            <RoadTile kind={t.kind} rot={t.rot} outline={null} />
+            {t.type === "road" ? (
+              <RoadTile kind={t.kind} rot={t.rot} outline={null} />
+            ) : (
+              <BuildingTile kind={t.kind} outline={null} />
+            )}
           </div>
         );
       })}
@@ -99,7 +104,11 @@ export function GridCanvas() {
           className="absolute pointer-events-none opacity-60"
           style={{ left: hover.x * TILE_SIZE, top: hover.y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
         >
-          <RoadTile kind={selected} rot={rot} outline="hover" />
+          {selected.type === "road" ? (
+            <RoadTile kind={selected.kind} rot={rot} outline="hover" />
+          ) : (
+            <BuildingTile kind={selected.kind} outline="hover" />
+          )}
         </div>
       )}
     </div>

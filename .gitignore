@@ -12,4 +12,5 @@ next-env.d.ts
 .lh
 .devserver.out.log
 .devserver.err.log
+dev-server*.log
 

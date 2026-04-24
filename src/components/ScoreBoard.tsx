@@ -7,7 +7,7 @@ export function ScoreBoard() {
   const grid = useGame((s) => s.grid);
   const clearAll = useGame((s) => s.clearAll);
   const score = useMemo(() => scoreGrid(grid), [grid]);
-  const efficiency = score.tiles === 0 ? 0 : Math.round((score.connectedTiles / score.tiles) * 100);
+  const efficiency = score.roads === 0 ? 0 : Math.round((score.connectedTiles / score.roads) * 100);
 
   return (
     <aside className="bg-white rounded-xl2 shadow-pop border-2 border-asphalt-200 p-4 w-[260px] shrink-0">
@@ -23,6 +23,8 @@ export function ScoreBoard() {
 
       <ul className="text-sm space-y-1.5">
         <Row label="Tiles Placed" value={score.tiles} />
+        <Row label="Roads" value={score.roads} />
+        <Row label="Buildings" value={score.buildings} good={score.buildings > 0} />
         <Row label="Connected" value={`${score.connectedTiles} (${efficiency}%)`} good={efficiency >= 70} />
         <Row label="Open Ends" value={score.openEnds} warn={score.openEnds > 0} />
         <Row label="Mismatches" value={score.mismatched} bad={score.mismatched > 0} />
