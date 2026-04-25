@@ -11,13 +11,23 @@ export type SelectedTool =
   | { type: "building"; kind: BuildingKind }
   | { type: "water"; kind: WaterKind };
 
+export type MapEntry = { id: string; name: string; grid: GridMap };
+
 export type GameSnapshot = {
   gridEntries: Array<[string, Tile]>;
   selected: SelectedTool | null;
   rot: Rot;
 };
 
+function makeId() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+const DEFAULT_MAP: MapEntry = { id: "default", name: "My City", grid: new Map() };
+
 type State = {
+  maps: MapEntry[];
+  activeMapId: string;
   grid: GridMap;
   selected: SelectedTool | null;
   rot: Rot;
@@ -30,17 +40,30 @@ type State = {
   cycleRot: () => void;
   clearAll: () => void;
   hydrateSnapshot: (snapshot: GameSnapshot) => void;
+  addMap: (name: string) => void;
+  deleteMap: (id: string) => void;
+  renameMap: (id: string, name: string) => void;
+  switchMap: (id: string) => void;
+  logout: () => void;
 };
 
+function syncGrid(maps: MapEntry[], activeMapId: string, grid: GridMap): MapEntry[] {
+  return maps.map((m) => (m.id === activeMapId ? { ...m, grid: new Map(grid) } : m));
+}
+
 export const useGame = create<State>((set, get) => ({
+  maps: [DEFAULT_MAP],
+  activeMapId: DEFAULT_MAP.id,
   grid: new Map(),
   selected: { type: "road", kind: "straight" },
   rot: 0,
   feedback: null,
+
   setSelected: (k) => set({ selected: k }),
   cycleRot: () => set((s) => ({ rot: (((s.rot + 1) % 4) as Rot) })),
+
   placeTile: (x, y) => {
-    const { selected, rot, grid } = get();
+    const { selected, rot, grid, maps, activeMapId } = get();
     if (!selected) return;
     const next = new Map(grid);
     const tile: Tile =
@@ -52,40 +75,93 @@ export const useGame = create<State>((set, get) => ({
     next.set(cellKey(x, y), tile);
     const ev = tile.type === "road" ? evalTile(next, x, y) : null;
     const kind = ev && ev.mismatched > 0 ? "bad" : "ok";
-    set({ grid: next, feedback: { x, y, kind, at: Date.now() } });
+    set({ grid: next, feedback: { x, y, kind, at: Date.now() }, maps: syncGrid(maps, activeMapId, next) });
   },
+
   removeTile: (x, y) => {
-    const next = new Map(get().grid);
+    const { grid, maps, activeMapId } = get();
+    const next = new Map(grid);
     next.delete(cellKey(x, y));
-    set({ grid: next });
+    set({ grid: next, maps: syncGrid(maps, activeMapId, next) });
   },
+
   rotateTile: (x, y) => {
-    const grid = get().grid;
+    const { grid, maps, activeMapId } = get();
     const t = grid.get(cellKey(x, y));
     if (!t) return;
     const next = new Map(grid);
     next.set(cellKey(x, y), { ...t, rot: (((t.rot + 1) % 4) as Rot) });
-    const ev = evalTile(next, x, y);
-    const kind = ev.mismatched > 0 ? "bad" : "ok";
-    set({ grid: next, feedback: { x, y, kind, at: Date.now() } });
+    const ev = t.type === "road" ? evalTile(next, x, y) : null;
+    const kind = ev && ev.mismatched > 0 ? "bad" : "ok";
+    set({ grid: next, feedback: { x, y, kind, at: Date.now() }, maps: syncGrid(maps, activeMapId, next) });
   },
+
   renameTile: (x, y, name) => {
-    const grid = get().grid;
+    const { grid, maps, activeMapId } = get();
     const t = grid.get(cellKey(x, y));
     if (!t) return;
     const next = new Map(grid);
     const cleanName = name.trim();
     next.set(cellKey(x, y), { ...t, name: cleanName || undefined });
-    set({ grid: next });
+    set({ grid: next, maps: syncGrid(maps, activeMapId, next) });
   },
-  clearAll: () => set({ grid: new Map() }),
-  hydrateSnapshot: (snapshot) =>
+
+  clearAll: () => {
+    const { maps, activeMapId } = get();
+    const empty: GridMap = new Map();
+    set({ grid: empty, maps: syncGrid(maps, activeMapId, empty) });
+  },
+
+  hydrateSnapshot: (snapshot) => {
+    const { maps, activeMapId } = get();
+    const newGrid = new Map(snapshot.gridEntries);
     set({
-      grid: new Map(snapshot.gridEntries),
+      grid: newGrid,
       selected: snapshot.selected,
       rot: snapshot.rot,
       feedback: null,
-    }),
+      maps: syncGrid(maps, activeMapId, newGrid),
+    });
+  },
+
+  addMap: (name) => {
+    const { maps, activeMapId, grid } = get();
+    const saved = syncGrid(maps, activeMapId, grid);
+    const newMap: MapEntry = { id: makeId(), name, grid: new Map() };
+    set({ maps: [...saved, newMap], activeMapId: newMap.id, grid: new Map() });
+  },
+
+  deleteMap: (id) => {
+    const { maps, activeMapId, grid } = get();
+    if (maps.length <= 1) return;
+    const saved = syncGrid(maps, activeMapId, grid).filter((m) => m.id !== id);
+    if (id === activeMapId) {
+      const next = saved[0];
+      set({ maps: saved, activeMapId: next.id, grid: new Map(next.grid) });
+    } else {
+      set({ maps: saved });
+    }
+  },
+
+  renameMap: (id, name) => {
+    const { maps, activeMapId, grid } = get();
+    const saved = syncGrid(maps, activeMapId, grid).map((m) => (m.id === id ? { ...m, name } : m));
+    set({ maps: saved });
+  },
+
+  switchMap: (id) => {
+    const { maps, activeMapId, grid } = get();
+    if (id === activeMapId) return;
+    const saved = syncGrid(maps, activeMapId, grid);
+    const target = saved.find((m) => m.id === id);
+    if (!target) return;
+    set({ maps: saved, activeMapId: id, grid: new Map(target.grid) });
+  },
+
+  logout: () => {
+    const fresh: MapEntry = { id: "default", name: "My City", grid: new Map() };
+    set({ maps: [fresh], activeMapId: fresh.id, grid: new Map(), selected: { type: "road", kind: "straight" }, rot: 0, feedback: null });
+  },
 }));
 
 export function serializeGameSnapshot(state: Pick<State, "grid" | "selected" | "rot">): string {

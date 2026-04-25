@@ -1,6 +1,10 @@
 import { AuthControls } from "@/components/AuthControls";
 
-export function Header() {
+interface HeaderProps {
+  onSettingsOpen: () => void;
+}
+
+export function Header({ onSettingsOpen }: HeaderProps) {
   return (
     <header className="w-full bg-white/80 backdrop-blur border-b-2 border-asphalt-200 sticky top-0 z-20">
       <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
@@ -13,6 +17,13 @@ export function Header() {
         </div>
 
         <nav className="flex items-center gap-2">
+          <button
+            onClick={onSettingsOpen}
+            className="px-3 py-1.5 rounded-full text-sm font-semibold transition text-asphalt-700 hover:bg-asphalt-100 flex items-center gap-1.5"
+          >
+            <GearIcon />
+            Settings
+          </button>
           <Pill active>Builder</Pill>
           <AuthControls />
         </nav>
@@ -58,5 +69,19 @@ function Logo() {
         <rect x="33" y="33" width="8" height="7" rx="1.4" fill="#FCE7F3" stroke="#1E293B" strokeWidth="1.5" />
       </svg>
     </div>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M7.5 9.5a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M12.2 9.1l.6 1-.9 1.6-1.1-.3a4.8 4.8 0 01-1 .6l-.2 1.1H8l-.2-1.1a4.8 4.8 0 01-1-.6l-1.1.3-.9-1.6.6-1a4.9 4.9 0 010-1.2l-.6-1 .9-1.6 1.1.3a4.8 4.8 0 011-.6L8 3.9h1.6l.2 1.1a4.8 4.8 0 011 .6l1.1-.3.9 1.6-.6 1a4.9 4.9 0 010 1.2z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
