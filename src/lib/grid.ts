@@ -1,10 +1,12 @@
 import { DIR_DELTA, DIRS, OPPOSITE, hasConnector, type Dir, type RoadKind, ROADS } from "./roads";
 import type { BuildingKind } from "./buildings";
+import type { WaterKind } from "./water";
 
 export type Rot = 0 | 1 | 2 | 3;
-export type RoadTileData = { type: "road"; kind: RoadKind; rot: Rot };
-export type BuildingTileData = { type: "building"; kind: BuildingKind; rot: Rot };
-export type Tile = RoadTileData | BuildingTileData;
+export type RoadTileData = { type: "road"; kind: RoadKind; rot: Rot; name?: string };
+export type BuildingTileData = { type: "building"; kind: BuildingKind; rot: Rot; name?: string };
+export type WaterTileData = { type: "water"; kind: WaterKind; rot: Rot; name?: string };
+export type Tile = RoadTileData | BuildingTileData | WaterTileData;
 export type GridMap = Map<string, Tile>;
 
 export const cellKey = (x: number, y: number) => `${x},${y}`;
@@ -48,6 +50,7 @@ export type ScoreBreakdown = {
   tiles: number;
   roads: number;
   buildings: number;
+  waters: number;
   connectedTiles: number;
   openEnds: number;
   mismatched: number;
@@ -73,10 +76,11 @@ export function scoreGrid(grid: GridMap): ScoreBreakdown {
   const loops = countLoops(grid);
   const diversity = kinds.size;
   const roads = [...grid.values()].filter((t) => t.type === "road").length;
-  const buildings = grid.size - roads;
+  const buildings = [...grid.values()].filter((t) => t.type === "building").length;
+  const waters = grid.size - roads - buildings;
   const bonusDiversity = diversity * 10;
   const total = connected * 20 + loops * 50 + bonusDiversity + buildings * 3 - mis * 15 - open * 2;
-  return { tiles: grid.size, roads, buildings, connectedTiles: connected, openEnds: open, mismatched: mis, loops, bonusDiversity, total: Math.max(0, total) };
+  return { tiles: grid.size, roads, buildings, waters, connectedTiles: connected, openEnds: open, mismatched: mis, loops, bonusDiversity, total: Math.max(0, total) };
 }
 
 function countLoops(grid: GridMap): number {

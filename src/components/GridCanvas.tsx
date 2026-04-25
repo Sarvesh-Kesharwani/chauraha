@@ -1,12 +1,27 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useGame } from "@/store/game";
-import { cellKey, parseKey } from "@/lib/grid";
+import { cellKey, parseKey, type Tile } from "@/lib/grid";
+import { BUILDINGS } from "@/lib/buildings";
+import { ROADS } from "@/lib/roads";
+import { WATERS } from "@/lib/water";
 import { BuildingTile } from "./BuildingTile";
 import { RoadTile, TILE_SIZE } from "./RoadTile";
+import { WaterTile } from "./WaterTile";
 
-const GRID_COLS = 18;
-const GRID_ROWS = 12;
+const GRASS_LAYERS = [
+  "radial-gradient(circle at 12% 18%, rgba(255,255,255,0.9) 0 1.2px, transparent 1.4px)",
+  "radial-gradient(circle at 42% 72%, rgba(250,204,21,0.8) 0 1.1px, transparent 1.3px)",
+  "radial-gradient(circle at 78% 34%, rgba(244,114,182,0.7) 0 1px, transparent 1.2px)",
+  "radial-gradient(circle at 18% 82%, rgba(34,197,94,0.45) 0 2px, transparent 2.3px)",
+  "radial-gradient(circle at 68% 16%, rgba(22,163,74,0.35) 0 2.5px, transparent 2.8px)",
+  "linear-gradient(135deg, rgba(255,255,255,0.22) 0 8%, transparent 8% 50%, rgba(22,163,74,0.08) 50% 58%, transparent 58%)",
+  "radial-gradient(ellipse at 24% 18%, #D9F99D 0%, transparent 34%)",
+  "radial-gradient(ellipse at 82% 78%, #86EFAC 0%, transparent 38%)",
+  "linear-gradient(160deg, #CFFAFE 0%, #BBF7D0 42%, #A7F3D0 100%)",
+];
+
+const GRASS_SIZES = "92px 92px, 116px 116px, 104px 104px, 130px 130px, 150px 150px, 144px 144px, 100% 100%, 100% 100%, 100% 100%";
 
 export function GridCanvas() {
   const grid = useGame((s) => s.grid);
@@ -15,51 +30,148 @@ export function GridCanvas() {
   const placeTile = useGame((s) => s.placeTile);
   const removeTile = useGame((s) => s.removeTile);
   const rotateTile = useGame((s) => s.rotateTile);
+  const renameTile = useGame((s) => s.renameTile);
   const cycleRot = useGame((s) => s.cycleRot);
   const feedback = useGame((s) => s.feedback);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [viewport, setViewport] = useState({ width: 960, height: 640 });
+  const [camera, setCamera] = useState({ x: -6, y: -4 });
+  const [spaceDown, setSpaceDown] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ startX: number; startY: number; startCamX: number; startCamY: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setViewport({ width: rect.width, height: rect.height });
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "r") {
-        if (hover && grid.has(cellKey(hover.x, hover.y))) rotateTile(hover.x, hover.y);
-        else cycleRot();
-      }
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTypingTarget =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      if (e.code === "Space") setSpaceDown(true);
+      if (isTypingTarget) return;
+      if (e.code !== "KeyR" && e.key.toLowerCase() !== "r") return;
+
+      e.preventDefault();
+      if (hover && grid.has(cellKey(hover.x, hover.y))) rotateTile(hover.x, hover.y);
+      else cycleRot();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpaceDown(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, [hover, grid, rotateTile, cycleRot]);
 
-  const width = GRID_COLS * TILE_SIZE;
-  const height = GRID_ROWS * TILE_SIZE;
+  const activeCloud = (() => {
+    if (editingKey) {
+      const [x, y] = parseKey(editingKey);
+      const tile = grid.get(editingKey);
+      return tile ? { x, y, key: editingKey, tile } : null;
+    }
+    if (!hover) return null;
+    const key = cellKey(hover.x, hover.y);
+    const tile = grid.get(key);
+    return tile ? { x: hover.x, y: hover.y, key, tile } : null;
+  })();
+
+  const pixelOffsetX = -((camera.x * TILE_SIZE) % 144);
+  const pixelOffsetY = -((camera.y * TILE_SIZE) % 144);
 
   const cellAt = (clientX: number, clientY: number) => {
     const el = ref.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    const x = Math.floor((clientX - r.left) / TILE_SIZE);
-    const y = Math.floor((clientY - r.top) / TILE_SIZE);
-    if (x < 0 || y < 0 || x >= GRID_COLS || y >= GRID_ROWS) return null;
-    return { x, y };
+    const localX = clientX - r.left;
+    const localY = clientY - r.top;
+    return {
+      x: Math.floor(localX / TILE_SIZE + camera.x),
+      y: Math.floor(localY / TILE_SIZE + camera.y),
+    };
+  };
+
+  const screenPos = (x: number, y: number) => ({
+    left: (x - camera.x) * TILE_SIZE,
+    top: (y - camera.y) * TILE_SIZE,
+  });
+
+  const startPan = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!(e.button === 1 || (e.button === 0 && spaceDown))) return false;
+    panRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startCamX: camera.x,
+      startCamY: camera.y,
+    };
+    return true;
   };
 
   return (
     <div
       ref={ref}
-      className="relative rounded-xl2 shadow-pop border-[3px] border-asphalt-900/80 overflow-hidden no-select"
+      className="relative h-full w-full overflow-hidden rounded-xl2 border-[3px] border-asphalt-900/80 shadow-pop no-select cursor-default"
       style={{
-        width,
-        height,
-        background:
-          "radial-gradient(ellipse at 30% 20%, #DCFCE7 0%, #BBF7D0 60%, #86EFAC 100%)",
+        minHeight: 0,
+        background: GRASS_LAYERS.join(", "),
+        backgroundSize: GRASS_SIZES,
+        backgroundPosition: `${pixelOffsetX}px ${pixelOffsetY}px, ${pixelOffsetX}px ${pixelOffsetY}px, ${pixelOffsetX}px ${pixelOffsetY}px, ${pixelOffsetX}px ${pixelOffsetY}px, ${pixelOffsetX}px ${pixelOffsetY}px, ${pixelOffsetX}px ${pixelOffsetY}px, center, center, center`,
       }}
-      onMouseMove={(e) => setHover(cellAt(e.clientX, e.clientY))}
-      onMouseLeave={() => setHover(null)}
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-tile-name-cloud]")) return;
+        if (startPan(e)) return;
+      }}
+      onMouseMove={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-tile-name-cloud]")) return;
+
+        if (panRef.current) {
+          const dx = (e.clientX - panRef.current.startX) / TILE_SIZE;
+          const dy = (e.clientY - panRef.current.startY) / TILE_SIZE;
+          setCamera({
+            x: panRef.current.startCamX - dx,
+            y: panRef.current.startCamY - dy,
+          });
+          return;
+        }
+
+        setHover(cellAt(e.clientX, e.clientY));
+      }}
+      onMouseUp={() => {
+        panRef.current = null;
+      }}
+      onMouseLeave={() => {
+        panRef.current = null;
+        if (!editingKey) setHover(null);
+      }}
       onClick={(e) => {
+        if (panRef.current) return;
         const c = cellAt(e.clientX, e.clientY);
-        if (!c || !selected) return;
+        if (!c || !selected || spaceDown) return;
         placeTile(c.x, c.y);
       }}
       onContextMenu={(e) => {
@@ -75,44 +187,204 @@ export function GridCanvas() {
       onDrop={(e) => {
         e.preventDefault();
         const c = cellAt(e.clientX, e.clientY);
-        if (!c) return;
+        if (!c || spaceDown) return;
         placeTile(c.x, c.y);
       }}
     >
+      <div
+        className="absolute inset-0 pointer-events-none opacity-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(15,23,42,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.08) 1px, transparent 1px)",
+          backgroundSize: `${TILE_SIZE}px ${TILE_SIZE}px`,
+          backgroundPosition: `${-(camera.x * TILE_SIZE)}px ${-(camera.y * TILE_SIZE)}px`,
+        }}
+      />
+
       {[...grid.entries()].map(([k, t]) => {
         const [x, y] = parseKey(k);
+        const pos = screenPos(x, y);
+        if (pos.left < -TILE_SIZE || pos.top < -TILE_SIZE || pos.left > viewport.width || pos.top > viewport.height) {
+          return null;
+        }
+
         const fresh = feedback && feedback.x === x && feedback.y === y;
         const pulse = fresh && feedback.kind === "ok";
         const shake = fresh && feedback.kind === "bad";
+        const named = Boolean(t.name?.trim());
+
         return (
           <div
             key={k}
             className={`absolute ${pulse ? "animate-pulseJoin" : ""} ${shake ? "animate-shake" : ""}`}
-            style={{ left: x * TILE_SIZE, top: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
+            style={{ left: pos.left, top: pos.top, width: TILE_SIZE, height: TILE_SIZE }}
           >
             {t.type === "road" ? (
-              <RoadTile kind={t.kind} rot={t.rot} outline={null} />
+              <RoadTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} />
+            ) : t.type === "water" ? (
+              <WaterTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} />
             ) : (
-              <BuildingTile kind={t.kind} outline={null} />
+              <BuildingTile kind={t.kind} outline={named ? "named" : null} />
             )}
           </div>
         );
       })}
 
-      {hover && selected && !grid.has(cellKey(hover.x, hover.y)) && (
-        <div
-          className="absolute pointer-events-none opacity-60"
-          style={{ left: hover.x * TILE_SIZE, top: hover.y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
-        >
-          {selected.type === "road" ? (
-            <RoadTile kind={selected.kind} rot={rot} outline="hover" />
-          ) : (
-            <BuildingTile kind={selected.kind} outline="hover" />
-          )}
+      {hover && selected && !spaceDown && !grid.has(cellKey(hover.x, hover.y)) && (() => {
+        const pos = screenPos(hover.x, hover.y);
+        return (
+          <div
+            className="absolute pointer-events-none opacity-60"
+            style={{ left: pos.left, top: pos.top, width: TILE_SIZE, height: TILE_SIZE }}
+          >
+            {selected.type === "road" ? (
+              <RoadTile kind={selected.kind} rot={rot} outline="hover" />
+            ) : selected.type === "water" ? (
+              <WaterTile kind={selected.kind} rot={rot} outline="hover" />
+            ) : (
+              <BuildingTile kind={selected.kind} outline="hover" />
+            )}
+          </div>
+        );
+      })()}
+
+      {activeCloud && (
+        <TileNameCloud
+          screenX={screenPos(activeCloud.x, activeCloud.y).left}
+          screenY={screenPos(activeCloud.x, activeCloud.y).top}
+          viewportWidth={viewport.width}
+          name={activeCloud.tile.name || getTileLabel(activeCloud.tile)}
+          hindi={getTileHindi(activeCloud.tile)}
+          editing={editingKey === activeCloud.key}
+          draftName={draftName}
+          onStartEdit={() => {
+            setEditingKey(activeCloud.key);
+            setDraftName(activeCloud.tile.name || getTileLabel(activeCloud.tile));
+          }}
+          onDraftChange={setDraftName}
+          onCancel={() => {
+            setEditingKey(null);
+            setDraftName("");
+          }}
+          onSave={() => {
+            renameTile(activeCloud.x, activeCloud.y, draftName);
+            setEditingKey(null);
+            setDraftName("");
+          }}
+        />
+      )}
+
+      <div className="absolute bottom-3 right-3 rounded-full border-2 border-asphalt-900 bg-white/80 px-3 py-1 text-[11px] font-bold text-asphalt-700 backdrop-blur">
+        Space + drag to pan
+      </div>
+    </div>
+  );
+}
+
+function getTileLabel(tile: Tile) {
+  return tile.type === "road" ? ROADS[tile.kind].label : tile.type === "water" ? WATERS[tile.kind].label : BUILDINGS[tile.kind].label;
+}
+
+function getTileHindi(tile: Tile) {
+  return tile.type === "road" ? ROADS[tile.kind].hindi : tile.type === "water" ? WATERS[tile.kind].hindi : BUILDINGS[tile.kind].hindi;
+}
+
+function TileNameCloud({
+  screenX,
+  screenY,
+  viewportWidth,
+  name,
+  hindi,
+  editing,
+  draftName,
+  onStartEdit,
+  onDraftChange,
+  onCancel,
+  onSave,
+}: {
+  screenX: number;
+  screenY: number;
+  viewportWidth: number;
+  name: string;
+  hindi: string;
+  editing: boolean;
+  draftName: string;
+  onStartEdit: () => void;
+  onDraftChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  const below = screenY < 60;
+  const left = Math.min(Math.max(screenX + TILE_SIZE / 2 - 88, 8), viewportWidth - 192);
+  const top = below ? screenY + TILE_SIZE - 2 : screenY - 54;
+
+  const stop = (e: MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    onSave();
+  };
+
+  return (
+    <div
+      data-tile-name-cloud
+      className="absolute z-30 w-48 rounded-[26px] border-[3px] border-fuchsia-500 bg-[#FFF7AD] px-4 py-2.5 text-asphalt-950 shadow-[0_8px_0_#7C2D12,0_18px_30px_rgba(124,45,18,0.35)]"
+      style={{ left, top }}
+      onClick={stop}
+      onContextMenu={stop}
+      onMouseDown={stop}
+    >
+      <div
+        className={`absolute left-1/2 h-5 w-5 -translate-x-1/2 rotate-45 border-fuchsia-500 bg-[#FFF7AD] ${
+          below ? "-top-3 border-l-[3px] border-t-[3px]" : "-bottom-3 border-b-[3px] border-r-[3px]"
+        }`}
+      />
+      <div className="absolute -left-3 top-3 h-7 w-7 rounded-full border-[3px] border-fuchsia-500 bg-[#FFF7AD]" />
+      <div className="absolute -right-4 top-2 h-9 w-9 rounded-full border-[3px] border-fuchsia-500 bg-[#FFF7AD]" />
+      <div className="absolute left-7 -top-4 h-8 w-8 rounded-full border-[3px] border-fuchsia-500 bg-[#FFF7AD]" />
+
+      {editing ? (
+        <form onSubmit={submit} className="relative flex flex-col gap-2">
+          <input
+            value={draftName}
+            onChange={(e) => onDraftChange(e.target.value)}
+            autoFocus
+            maxLength={28}
+            className="h-9 rounded-xl border-2 border-asphalt-900 bg-white px-2 font-display text-sm font-extrabold text-asphalt-950 outline-none ring-fuchsia-300 focus:ring-4"
+            placeholder="Tile name"
+          />
+          <div className="flex gap-1.5">
+            <button type="submit" className="flex-1 rounded-xl border-2 border-asphalt-900 bg-lime-300 px-2 py-1 text-xs font-extrabold text-asphalt-950 shadow-tile">
+              Save
+            </button>
+            <button type="button" onClick={onCancel} className="flex-1 rounded-xl border-2 border-asphalt-900 bg-white px-2 py-1 text-xs font-bold text-asphalt-900 hover:bg-fuchsia-100">
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="relative flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-display text-base font-extrabold leading-tight text-fuchsia-700 drop-shadow-[1px_1px_0_#ffffff]">{name}</div>
+            <div className="truncate text-[10px] font-black uppercase text-asphalt-700">{hindi}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onStartEdit}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 border-asphalt-900 bg-fuchsia-500 text-white shadow-[0_3px_0_#1E293B] hover:-translate-y-0.5 hover:bg-lime-300 hover:text-asphalt-950"
+            aria-label="Edit tile name"
+            title="Edit tile name"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 20H8L18.5 9.5L14.5 5.5L4 16V20Z" fill="currentColor" />
+              <path d="M13.5 6.5L17.5 10.5" stroke="#1E293B" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M15.5 4.5L19.5 8.5L20.5 7.5C21.3 6.7 21.3 5.4 20.5 4.6L19.4 3.5C18.6 2.7 17.3 2.7 16.5 3.5L15.5 4.5Z" fill="currentColor" />
+            </svg>
+          </button>
         </div>
       )}
     </div>
   );
 }
-
-export { GRID_COLS, GRID_ROWS };

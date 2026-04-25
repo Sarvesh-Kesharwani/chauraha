@@ -225,9 +225,9 @@ export function RoadSvg({ kind }: { kind: RoadKind }) {
   }
 }
 
-export function RoadTile({ kind, rot, size = S, outline }: { kind: RoadKind; rot: 0 | 1 | 2 | 3; size?: number; outline?: "ok" | "bad" | "hover" | null }) {
+export function RoadTile({ kind, rot, size = S, outline }: { kind: RoadKind; rot: 0 | 1 | 2 | 3; size?: number; outline?: "ok" | "bad" | "hover" | "named" | null }) {
   const outlineColor =
-    outline === "ok" ? "#10B981" : outline === "bad" ? "#EF4444" : outline === "hover" ? "#F59E0B" : null;
+    outline === "ok" ? "#10B981" : outline === "bad" ? "#EF4444" : outline === "hover" ? "#F59E0B" : outline === "named" ? "#A855F7" : null;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${S} ${S}`} style={{ display: "block" }}>
       <g transform={`rotate(${rot * 90} ${H} ${H})`}>
@@ -236,6 +236,7 @@ export function RoadTile({ kind, rot, size = S, outline }: { kind: RoadKind; rot
       {outlineColor && (
         <rect x={1} y={1} width={S - 2} height={S - 2} fill="none" stroke={outlineColor} strokeWidth={3} rx={6} style={{ pointerEvents: "none" }} />
       )}
+      {outline === "named" && <circle cx={60} cy={12} r={5} fill="#FDE047" stroke="#0F172A" strokeWidth={1.5} />}
       <title>{kind}</title>
     </svg>
   );

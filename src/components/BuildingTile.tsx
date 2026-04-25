@@ -509,9 +509,9 @@ function TileArt({ kind }: { kind: BuildingKind }) {
   }
 }
 
-export function BuildingTile({ kind, size = S, outline }: { kind: BuildingKind; size?: number; outline?: "ok" | "bad" | "hover" | null }) {
+export function BuildingTile({ kind, size = S, outline }: { kind: BuildingKind; size?: number; outline?: "ok" | "bad" | "hover" | "named" | null }) {
   const outlineColor =
-    outline === "ok" ? "#10B981" : outline === "bad" ? "#EF4444" : outline === "hover" ? "#F59E0B" : null;
+    outline === "ok" ? "#10B981" : outline === "bad" ? "#EF4444" : outline === "hover" ? "#F59E0B" : outline === "named" ? "#A855F7" : null;
   const def = BUILDINGS[kind];
 
   return (
@@ -520,6 +520,7 @@ export function BuildingTile({ kind, size = S, outline }: { kind: BuildingKind; 
       {outlineColor && (
         <rect x={1} y={1} width={S - 2} height={S - 2} fill="none" stroke={outlineColor} strokeWidth={3} rx={6} style={{ pointerEvents: "none" }} />
       )}
+      {outline === "named" && <circle cx={60} cy={12} r={5} fill="#FDE047" stroke="#0F172A" strokeWidth={1.5} />}
       <title>{def.label}</title>
     </svg>
   );
