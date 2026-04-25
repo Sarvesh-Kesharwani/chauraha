@@ -40,6 +40,24 @@ export function GridCanvas() {
   const [viewport, setViewport] = useState({ width: 960, height: 640 });
   const [camera, setCamera] = useState({ x: -6, y: -4 });
   const ref = useRef<HTMLDivElement>(null);
+
+  const focusCity = () => {
+    if (grid.size === 0) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const key of grid.keys()) {
+      const [x, y] = parseKey(key);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setCamera({
+      x: cx - viewport.width / (2 * TILE_SIZE),
+      y: cy - viewport.height / (2 * TILE_SIZE),
+    });
+  };
   const panRef = useRef<{ startX: number; startY: number; startCamX: number; startCamY: number; moved: boolean } | null>(null);
   const justPannedRef = useRef(false);
 
@@ -281,10 +299,33 @@ export function GridCanvas() {
         />
       )}
 
+      {grid.size > 0 && (
+        <button
+          onClick={focusCity}
+          className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border-2 border-asphalt-900 bg-white/90 px-3 py-1 text-[11px] font-bold text-asphalt-700 shadow-tile backdrop-blur hover:-translate-y-0.5 hover:bg-marigold-400/20 active:translate-y-0 transition"
+          title="Find my city"
+        >
+          <LocateIcon />
+          Find City
+        </button>
+      )}
+
       <div className="absolute bottom-3 right-3 rounded-full border-2 border-asphalt-900 bg-white/80 px-3 py-1 text-[11px] font-bold text-asphalt-700 backdrop-blur">
         Right-click + drag to pan · Right-click a tile to remove
       </div>
     </div>
+  );
+}
+
+function LocateIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <line x1="12" y1="2" x2="12" y2="6" />
+      <line x1="12" y1="18" x2="12" y2="22" />
+      <line x1="2" y1="12" x2="6" y2="12" />
+      <line x1="18" y1="12" x2="22" y2="12" />
+    </svg>
   );
 }
 
