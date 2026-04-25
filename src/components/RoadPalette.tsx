@@ -25,20 +25,20 @@ export function RoadPalette() {
         : false;
 
   return (
-    <aside className="bg-white rounded-xl2 shadow-pop border-2 border-asphalt-200 p-4 w-[260px] shrink-0">
-      <div className="flex items-baseline justify-between mb-3">
+    <aside className="bg-white rounded-xl2 shadow-pop border-2 border-asphalt-200 p-3 w-[260px] shrink-0 flex flex-col h-full min-h-0">
+      <div className="flex items-baseline justify-between mb-2 shrink-0">
         <h2 className="font-display font-extrabold text-lg text-asphalt-900">City Assets</h2>
-        <span className="text-xs text-asphalt-500">Sadak, Bhavan, Pani</span>
+        <span className="text-[10px] text-asphalt-500">Sadak, Bhavan, Pani</span>
       </div>
 
-      <div className="grid grid-cols-3 rounded-xl border-2 border-asphalt-200 bg-asphalt-50 p-1 mb-3">
+      <div className="grid grid-cols-3 rounded-xl border-2 border-asphalt-200 bg-asphalt-50 p-1 mb-2 shrink-0">
         <TabButton active={tab === "roads"} onClick={() => setTab("roads")}>Roads</TabButton>
         <TabButton active={tab === "buildings"} onClick={() => setTab("buildings")}>Buildings</TabButton>
         <TabButton active={tab === "water"} onClick={() => setTab("water")}>Water</TabButton>
       </div>
 
       {tab === "roads" ? (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
           {ROAD_ORDER.map((kind) => {
             const def = ROADS[kind];
             const active = selected?.type === "road" && selected.kind === kind;
@@ -69,7 +69,7 @@ export function RoadPalette() {
           })}
         </div>
       ) : tab === "buildings" ? (
-        <div className="grid grid-cols-2 gap-2 max-h-[520px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
           {BUILDING_ORDER.map((kind) => {
             const def = BUILDINGS[kind];
             const active = selected?.type === "building" && selected.kind === kind;
@@ -100,7 +100,7 @@ export function RoadPalette() {
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
           {WATER_ORDER.map((kind) => {
             const def = WATERS[kind];
             const active = selected?.type === "water" && selected.kind === kind;
@@ -131,18 +131,15 @@ export function RoadPalette() {
       {canRotate && (
         <button
           onClick={cycleRot}
-          className="mt-4 w-full rounded-xl border-2 border-asphalt-200 bg-white py-2 font-bold text-asphalt-700 hover:bg-asphalt-50 shadow-tile active:translate-y-0.5"
+          className="mt-2 w-full rounded-xl border-2 border-asphalt-200 bg-white py-1.5 text-sm font-bold text-asphalt-700 hover:bg-asphalt-50 shadow-tile active:translate-y-0.5 shrink-0"
         >
           Rotate {rot * 90} deg <span className="text-asphalt-500 text-xs">(R)</span>
         </button>
       )}
 
-      <div className="mt-3 text-[11px] text-asphalt-500 leading-snug">
-        <div>- Click grid to place</div>
-        <div>- Right-click to remove</div>
-        <div>- Hold <kbd className="px-1 bg-asphalt-100 rounded">Space</kbd> to pan only</div>
-        <div>- Press <kbd className="px-1 bg-asphalt-100 rounded">R</kbd> to rotate roads and water</div>
-        <div>- Water set: canals, river bends, pond, ghat</div>
+      <div className="mt-2 text-[10px] text-asphalt-500 leading-snug shrink-0">
+        <div>- Left-click to place, right-click a tile to remove</div>
+        <div>- Right-click + drag to pan, <kbd className="px-1 bg-asphalt-100 rounded">R</kbd> to rotate</div>
       </div>
     </aside>
   );

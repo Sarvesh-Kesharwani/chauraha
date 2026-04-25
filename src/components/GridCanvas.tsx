@@ -39,9 +39,9 @@ export function GridCanvas() {
   const [draftName, setDraftName] = useState("");
   const [viewport, setViewport] = useState({ width: 960, height: 640 });
   const [camera, setCamera] = useState({ x: -6, y: -4 });
-  const [spaceDown, setSpaceDown] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const panRef = useRef<{ startX: number; startY: number; startCamX: number; startCamY: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; startCamX: number; startCamY: number; moved: boolean } | null>(null);
+  const justPannedRef = useRef(false);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -66,7 +66,6 @@ export function GridCanvas() {
         target?.tagName === "TEXTAREA" ||
         target?.isContentEditable;
 
-      if (e.code === "Space") setSpaceDown(true);
       if (isTypingTarget) return;
       if (e.code !== "KeyR" && e.key.toLowerCase() !== "r") return;
 
@@ -75,16 +74,8 @@ export function GridCanvas() {
       else cycleRot();
     };
 
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") setSpaceDown(false);
-    };
-
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [hover, grid, rotateTile, cycleRot]);
 
   const activeCloud = (() => {
@@ -120,12 +111,13 @@ export function GridCanvas() {
   });
 
   const startPan = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!(e.button === 1 || (e.button === 0 && spaceDown))) return false;
+    if (e.button !== 2 && e.button !== 1) return false;
     panRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       startCamX: camera.x,
       startCamY: camera.y,
+      moved: false,
     };
     return true;
   };
@@ -143,18 +135,24 @@ export function GridCanvas() {
       onMouseDown={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest("[data-tile-name-cloud]")) return;
-        if (startPan(e)) return;
+        if (startPan(e)) {
+          e.preventDefault();
+          return;
+        }
       }}
       onMouseMove={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest("[data-tile-name-cloud]")) return;
 
         if (panRef.current) {
-          const dx = (e.clientX - panRef.current.startX) / TILE_SIZE;
-          const dy = (e.clientY - panRef.current.startY) / TILE_SIZE;
+          const rawDx = e.clientX - panRef.current.startX;
+          const rawDy = e.clientY - panRef.current.startY;
+          if (Math.abs(rawDx) > 3 || Math.abs(rawDy) > 3) {
+            panRef.current.moved = true;
+          }
           setCamera({
-            x: panRef.current.startCamX - dx,
-            y: panRef.current.startCamY - dy,
+            x: panRef.current.startCamX - rawDx / TILE_SIZE,
+            y: panRef.current.startCamY - rawDy / TILE_SIZE,
           });
           return;
         }
@@ -162,20 +160,29 @@ export function GridCanvas() {
         setHover(cellAt(e.clientX, e.clientY));
       }}
       onMouseUp={() => {
-        panRef.current = null;
+        if (panRef.current) {
+          justPannedRef.current = panRef.current.moved;
+          panRef.current = null;
+        }
       }}
       onMouseLeave={() => {
-        panRef.current = null;
+        if (panRef.current) {
+          justPannedRef.current = panRef.current.moved;
+          panRef.current = null;
+        }
         if (!editingKey) setHover(null);
       }}
       onClick={(e) => {
-        if (panRef.current) return;
         const c = cellAt(e.clientX, e.clientY);
-        if (!c || !selected || spaceDown) return;
+        if (!c || !selected) return;
         placeTile(c.x, c.y);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
+        if (justPannedRef.current) {
+          justPannedRef.current = false;
+          return;
+        }
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
         if (grid.has(cellKey(c.x, c.y))) removeTile(c.x, c.y);
@@ -187,7 +194,7 @@ export function GridCanvas() {
       onDrop={(e) => {
         e.preventDefault();
         const c = cellAt(e.clientX, e.clientY);
-        if (!c || spaceDown) return;
+        if (!c) return;
         placeTile(c.x, c.y);
       }}
     >
@@ -230,7 +237,7 @@ export function GridCanvas() {
         );
       })}
 
-      {hover && selected && !spaceDown && !grid.has(cellKey(hover.x, hover.y)) && (() => {
+      {hover && selected && !panRef.current && !grid.has(cellKey(hover.x, hover.y)) && (() => {
         const pos = screenPos(hover.x, hover.y);
         return (
           <div
@@ -275,7 +282,7 @@ export function GridCanvas() {
       )}
 
       <div className="absolute bottom-3 right-3 rounded-full border-2 border-asphalt-900 bg-white/80 px-3 py-1 text-[11px] font-bold text-asphalt-700 backdrop-blur">
-        Space + drag to pan
+        Right-click + drag to pan · Right-click a tile to remove
       </div>
     </div>
   );

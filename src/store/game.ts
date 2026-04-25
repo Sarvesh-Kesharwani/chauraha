@@ -159,6 +159,10 @@ export const useGame = create<State>((set, get) => ({
   },
 
   logout: () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("chowkcraft_local_progress");
+      window.sessionStorage.removeItem("chowkcraft_drive_pulled");
+    }
     const fresh: MapEntry = { id: "default", name: "My City", grid: new Map() };
     set({ maps: [fresh], activeMapId: fresh.id, grid: new Map(), selected: { type: "road", kind: "straight" }, rot: 0, feedback: null });
   },
