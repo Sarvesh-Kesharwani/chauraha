@@ -4,47 +4,63 @@ import { Header } from "@/components/Header";
 import { GridCanvas } from "@/components/GridCanvas";
 import { RoadPalette } from "@/components/RoadPalette";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { NamedTilesPanel } from "@/components/NamedTilesPanel";
 import { useGame } from "@/store/game";
 
 export default function Page() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(true);
   const maps = useGame((s) => s.maps);
   const activeMapId = useGame((s) => s.activeMapId);
   const activeMap = maps.find((m) => m.id === activeMapId);
 
   return (
-    <main className="h-screen flex flex-col overflow-hidden">
-      <Header onSettingsOpen={() => setSettingsOpen(true)} />
+    <main className="h-screen w-screen relative overflow-hidden">
+      {/* Base layer — full-screen map */}
+      <div className="absolute inset-0">
+        <GridCanvas />
+      </div>
 
-      <section className="flex-1 min-h-0 max-w-[1500px] w-full mx-auto px-4 py-4 overflow-hidden">
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-asphalt-400 uppercase tracking-widest mb-0.5">
-            Currently building
-          </p>
-          <h1 className="font-display font-extrabold text-3xl text-asphalt-900 leading-tight">
-            {activeMap?.name ?? "My City"}
-          </h1>
-          <p className="text-asphalt-500 text-sm mt-0.5">
-            Drag sadak blocks onto the grid. Match connectors. Build loops. Avoid open ends and mismatches.
-          </p>
-        </div>
+      {/* Floating header */}
+      <div className="absolute inset-x-0 top-0 z-30">
+        <Header
+          onSettingsOpen={() => setSettingsOpen(true)}
+          cityName={activeMap?.name}
+        />
+      </div>
 
-        <div className="flex h-[calc(100%-88px)] min-h-0 gap-4 items-stretch">
-          <RoadPalette />
-          <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-            <GridCanvas />
-            <div className="mt-3 text-xs text-asphalt-500">
-              Tip: Hover a placed tile and press <kbd className="px-1 bg-white border rounded">R</kbd> to rotate it.
-            </div>
+      {/* Floating palette */}
+      <div className="absolute left-4 z-20 flex items-start gap-2" style={{ top: 76 }}>
+        {paletteOpen && (
+          <div className="overflow-hidden" style={{ height: "calc(100vh - 90px)" }}>
+            <RoadPalette />
           </div>
-        </div>
-      </section>
+        )}
+        <button
+          onClick={() => setPaletteOpen((v) => !v)}
+          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-asphalt-900 bg-white/90 shadow-tile backdrop-blur-sm hover:bg-asphalt-50 transition"
+          title={paletteOpen ? "Hide palette" : "Show palette"}
+        >
+          <ChevronIcon open={paletteOpen} />
+        </button>
+      </div>
 
-      <footer className="border-t border-asphalt-200 py-2 text-center text-xs text-asphalt-500">
-        ChowkCraft - Built with Next.js - Made in India
-      </footer>
+      {/* Named tiles panel (fixed to viewport) */}
+      <NamedTilesPanel />
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      {open ? (
+        <polyline points="15 18 9 12 15 6" />
+      ) : (
+        <polyline points="9 18 15 12 9 6" />
+      )}
+    </svg>
   );
 }

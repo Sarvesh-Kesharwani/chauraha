@@ -1,0 +1,19 @@
+{
+  "D:\\katni_map_game\\next-env.d.ts": 1777006886.438978,
+  "D:\\katni_map_game\\next.config.mjs": 1777006630.0964618,
+  "D:\\katni_map_game\\postcss.config.mjs": 1777006633.3015206,
+  "D:\\katni_map_game\\tailwind.config.ts": 1777006642.801797,
+  "D:\\katni_map_game\\app\\layout.tsx": 1777006665.692544,
+  "D:\\katni_map_game\\app\\page.tsx": 1777006837.4070272,
+  "D:\\katni_map_game\\src\\components\\GridCanvas.tsx": 1777042897.772403,
+  "D:\\katni_map_game\\src\\components\\Header.tsx": 1777006816.1686323,
+  "D:\\katni_map_game\\src\\components\\RoadPalette.tsx": 1777006793.791629,
+  "D:\\katni_map_game\\src\\components\\RoadTile.tsx": 1777043402.3050697,
+  "D:\\katni_map_game\\src\\components\\ScoreBoard.tsx": 1777006806.1560764,
+  "D:\\katni_map_game\\src\\lib\\grid.ts": 1777006713.1223328,
+  "D:\\katni_map_game\\src\\lib\\roads.ts": 1777043374.0380745,
+  "D:\\katni_map_game\\src\\store\\game.ts": 1777007295.062636,
+  "D:\\katni_map_game\\AGENTS.md": 1777087238.4758227,
+  "D:\\katni_map_game\\CLAUDE.md": 1777005707.6815388,
+  "D:\\katni_map_game\\PROJECT_BOOTSTRAP.md": 1777005657.2738504
+}

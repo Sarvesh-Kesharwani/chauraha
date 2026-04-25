@@ -2,17 +2,24 @@ import { AuthControls } from "@/components/AuthControls";
 
 interface HeaderProps {
   onSettingsOpen: () => void;
+  cityName?: string;
 }
 
-export function Header({ onSettingsOpen }: HeaderProps) {
+export function Header({ onSettingsOpen, cityName }: HeaderProps) {
   return (
-    <header className="w-full bg-white/80 backdrop-blur border-b-2 border-asphalt-200 sticky top-0 z-20">
+    <header className="w-full bg-white/70 backdrop-blur-md border-b-2 border-asphalt-200">
       <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Logo />
           <div>
             <div className="font-display font-extrabold text-xl text-asphalt-900 leading-none">ChowkCraft</div>
-            <div className="text-[11px] text-asphalt-500 leading-none mt-0.5">Desi city map maker</div>
+            {cityName ? (
+              <div className="text-[11px] text-asphalt-500 leading-none mt-0.5">
+                Building: <span className="font-bold text-asphalt-700">{cityName}</span>
+              </div>
+            ) : (
+              <div className="text-[11px] text-asphalt-500 leading-none mt-0.5">Desi city map maker</div>
+            )}
           </div>
         </div>
 

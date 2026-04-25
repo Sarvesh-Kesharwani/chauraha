@@ -6,6 +6,7 @@ import type { BuildingKind } from "@/lib/buildings";
 import type { WaterKind } from "@/lib/water";
 
 export type Feedback = { x: number; y: number; kind: "ok" | "bad"; at: number } | null;
+export type FocusTarget = { x: number; y: number } | null;
 export type SelectedTool =
   | { type: "road"; kind: RoadKind }
   | { type: "building"; kind: BuildingKind }
@@ -13,10 +14,14 @@ export type SelectedTool =
 
 export type MapEntry = { id: string; name: string; grid: GridMap };
 
+export type SerializedMapEntry = { id: string; name: string; gridEntries: Array<[string, Tile]> };
+
 export type GameSnapshot = {
   gridEntries: Array<[string, Tile]>;
   selected: SelectedTool | null;
   rot: Rot;
+  maps?: SerializedMapEntry[];
+  activeMapId?: string;
 };
 
 function makeId() {
@@ -32,6 +37,8 @@ type State = {
   selected: SelectedTool | null;
   rot: Rot;
   feedback: Feedback;
+  focusTarget: FocusTarget;
+  setFocusTarget: (t: FocusTarget) => void;
   placeTile: (x: number, y: number) => void;
   removeTile: (x: number, y: number) => void;
   rotateTile: (x: number, y: number) => void;
@@ -58,8 +65,10 @@ export const useGame = create<State>((set, get) => ({
   selected: { type: "road", kind: "straight" },
   rot: 0,
   feedback: null,
+  focusTarget: null,
 
   setSelected: (k) => set({ selected: k }),
+  setFocusTarget: (t) => set({ focusTarget: t }),
   cycleRot: () => set((s) => ({ rot: (((s.rot + 1) % 4) as Rot) })),
 
   placeTile: (x, y) => {
@@ -113,15 +122,33 @@ export const useGame = create<State>((set, get) => ({
   },
 
   hydrateSnapshot: (snapshot) => {
-    const { maps, activeMapId } = get();
-    const newGrid = new Map(snapshot.gridEntries);
-    set({
-      grid: newGrid,
-      selected: snapshot.selected,
-      rot: snapshot.rot,
-      feedback: null,
-      maps: syncGrid(maps, activeMapId, newGrid),
-    });
+    if (snapshot.maps && snapshot.maps.length > 0) {
+      const restoredMaps: MapEntry[] = snapshot.maps.map((m) => ({
+        id: m.id,
+        name: m.name,
+        grid: new Map(m.gridEntries),
+      }));
+      const activeId = snapshot.activeMapId ?? restoredMaps[0].id;
+      const activeMap = restoredMaps.find((m) => m.id === activeId) ?? restoredMaps[0];
+      set({
+        maps: restoredMaps,
+        activeMapId: activeId,
+        grid: new Map(activeMap.grid),
+        selected: snapshot.selected,
+        rot: snapshot.rot,
+        feedback: null,
+      });
+    } else {
+      const newGrid = new Map(snapshot.gridEntries);
+      const { maps, activeMapId } = get();
+      set({
+        grid: newGrid,
+        selected: snapshot.selected,
+        rot: snapshot.rot,
+        feedback: null,
+        maps: syncGrid(maps, activeMapId, newGrid),
+      });
+    }
   },
 
   addMap: (name) => {
@@ -168,11 +195,13 @@ export const useGame = create<State>((set, get) => ({
   },
 }));
 
-export function serializeGameSnapshot(state: Pick<State, "grid" | "selected" | "rot">): string {
+export function serializeGameSnapshot(state: Pick<State, "grid" | "selected" | "rot" | "maps" | "activeMapId">): string {
   const snapshot: GameSnapshot = {
     gridEntries: [...state.grid.entries()],
     selected: state.selected,
     rot: state.rot,
+    maps: state.maps.map((m) => ({ id: m.id, name: m.name, gridEntries: [...m.grid.entries()] })),
+    activeMapId: state.activeMapId,
   };
   return JSON.stringify(snapshot);
 }
@@ -185,6 +214,8 @@ export function parseGameSnapshot(raw: string): GameSnapshot | null {
       gridEntries: parsed.gridEntries as Array<[string, Tile]>,
       selected: parsed.selected ?? { type: "road", kind: "straight" },
       rot: (parsed.rot ?? 0) as Rot,
+      maps: parsed.maps,
+      activeMapId: parsed.activeMapId,
     };
   } catch {
     return null;

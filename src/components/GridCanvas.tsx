@@ -33,6 +33,8 @@ export function GridCanvas() {
   const renameTile = useGame((s) => s.renameTile);
   const cycleRot = useGame((s) => s.cycleRot);
   const feedback = useGame((s) => s.feedback);
+  const focusTarget = useGame((s) => s.focusTarget);
+  const setFocusTarget = useGame((s) => s.setFocusTarget);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -51,8 +53,8 @@ export function GridCanvas() {
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
     }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
+    const cx = (minX + maxX + 1) / 2;
+    const cy = (minY + maxY + 1) / 2;
     setCamera({
       x: cx - viewport.width / (2 * TILE_SIZE),
       y: cy - viewport.height / (2 * TILE_SIZE),
@@ -96,6 +98,15 @@ export function GridCanvas() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [hover, grid, rotateTile, cycleRot]);
 
+  useEffect(() => {
+    if (!focusTarget) return;
+    setCamera({
+      x: focusTarget.x + 0.5 - viewport.width / (2 * TILE_SIZE),
+      y: focusTarget.y + 0.5 - viewport.height / (2 * TILE_SIZE),
+    });
+    setFocusTarget(null);
+  }, [focusTarget, setFocusTarget, viewport]);
+
   const activeCloud = (() => {
     if (editingKey) {
       const [x, y] = parseKey(editingKey);
@@ -137,6 +148,27 @@ export function GridCanvas() {
       startCamY: camera.y,
       moved: false,
     };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!panRef.current) return;
+      const rawDx = ev.clientX - panRef.current.startX;
+      const rawDy = ev.clientY - panRef.current.startY;
+      if (Math.abs(rawDx) > 3 || Math.abs(rawDy) > 3) panRef.current.moved = true;
+      setCamera({
+        x: panRef.current.startCamX - rawDx / TILE_SIZE,
+        y: panRef.current.startCamY - rawDy / TILE_SIZE,
+      });
+    };
+
+    const onUp = () => {
+      justPannedRef.current = panRef.current?.moved ?? false;
+      panRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
     return true;
   };
 
@@ -161,33 +193,10 @@ export function GridCanvas() {
       onMouseMove={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest("[data-tile-name-cloud]")) return;
-
-        if (panRef.current) {
-          const rawDx = e.clientX - panRef.current.startX;
-          const rawDy = e.clientY - panRef.current.startY;
-          if (Math.abs(rawDx) > 3 || Math.abs(rawDy) > 3) {
-            panRef.current.moved = true;
-          }
-          setCamera({
-            x: panRef.current.startCamX - rawDx / TILE_SIZE,
-            y: panRef.current.startCamY - rawDy / TILE_SIZE,
-          });
-          return;
-        }
-
+        if (panRef.current) return;
         setHover(cellAt(e.clientX, e.clientY));
       }}
-      onMouseUp={() => {
-        if (panRef.current) {
-          justPannedRef.current = panRef.current.moved;
-          panRef.current = null;
-        }
-      }}
       onMouseLeave={() => {
-        if (panRef.current) {
-          justPannedRef.current = panRef.current.moved;
-          panRef.current = null;
-        }
         if (!editingKey) setHover(null);
       }}
       onClick={(e) => {
@@ -251,6 +260,13 @@ export function GridCanvas() {
             ) : (
               <BuildingTile kind={t.kind} outline={named ? "named" : null} />
             )}
+            {named && (
+              <div className="absolute -top-4 left-0 right-0 flex justify-center pointer-events-none">
+                <span className="max-w-[80px] truncate rounded-full border border-fuchsia-400 bg-fuchsia-500 px-1.5 py-px text-[8px] font-bold leading-3 text-white shadow-sm">
+                  {t.name}
+                </span>
+              </div>
+            )}
           </div>
         );
       })}
@@ -301,7 +317,7 @@ export function GridCanvas() {
 
       {grid.size > 0 && (
         <button
-          onClick={focusCity}
+          onClick={(e) => { e.stopPropagation(); focusCity(); }}
           className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border-2 border-asphalt-900 bg-white/90 px-3 py-1 text-[11px] font-bold text-asphalt-700 shadow-tile backdrop-blur hover:-translate-y-0.5 hover:bg-marigold-400/20 active:translate-y-0 transition"
           title="Find my city"
         >
