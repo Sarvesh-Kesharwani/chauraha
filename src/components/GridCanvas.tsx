@@ -273,7 +273,7 @@ export function GridCanvas() {
           <div
             key={k}
             className={`absolute ${pulse ? "animate-pulseJoin" : ""} ${shake ? "animate-shake" : ""}`}
-            style={{ left: pos.left, top: pos.top, width: tileSize, height: tileSize }}
+            style={{ left: pos.left, top: pos.top, width: tileSize, height: tileSize, zIndex: named ? 2 : 1 }}
           >
             {t.type === "road" ? (
               <RoadTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} size={tileSize} />

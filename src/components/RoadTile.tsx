@@ -1,4 +1,5 @@
 "use client";
+import { useId } from "react";
 import type { RoadKind } from "@/lib/roads";
 
 const S = 72;
@@ -225,12 +226,15 @@ export function RoadSvg({ kind }: { kind: RoadKind }) {
   }
 }
 
-export function RoadTile({ kind, rot, size = S, outline }: { kind: RoadKind; rot: 0 | 1 | 2 | 3; size?: number; outline?: "ok" | "bad" | "hover" | "named" | null }) {
+export function RoadTile({ kind, rot, size = S, outline }: { kind: RoadKind; rot: 0 | 1 | 2 | 3; size?: number; outline?: "ok" | "bad" | "hover" | "named" | "selected" | null }) {
   const outlineColor =
     outline === "ok" ? "#10B981" : outline === "bad" ? "#EF4444" : outline === "hover" ? "#F59E0B" : outline === "named" ? "#A855F7" : null;
+  const glowId = useId();
+  const glowUrl = outline === "selected" ? `url(#${glowId})` : undefined;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${S} ${S}`} style={{ display: "block" }}>
-      <g transform={`rotate(${rot * 90} ${H} ${H})`}>
+      {outline === "selected" && <TileGlow id={glowId} />}
+      <g transform={`rotate(${rot * 90} ${H} ${H})`} filter={glowUrl}>
         <RoadSvg kind={kind} />
       </g>
       {outlineColor && (
@@ -243,3 +247,14 @@ export function RoadTile({ kind, rot, size = S, outline }: { kind: RoadKind; rot
 }
 
 export const TILE_SIZE = S;
+
+function TileGlow({ id }: { id: string }) {
+  return (
+    <defs>
+      <filter id={id} x="-35%" y="-35%" width="170%" height="170%" colorInterpolationFilters="sRGB">
+        <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#F59E0B" floodOpacity="0.95" />
+        <feDropShadow dx="0" dy="0" stdDeviation="5.8" floodColor="#F59E0B" floodOpacity="0.62" />
+      </filter>
+    </defs>
+  );
+}
