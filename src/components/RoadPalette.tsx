@@ -1,5 +1,5 @@
 "use client";
-import { type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { BUILDING_ORDER, BUILDINGS } from "@/lib/buildings";
 import { ROAD_ORDER, ROADS } from "@/lib/roads";
 import { WATER_ORDER, WATERS } from "@/lib/water";
@@ -11,9 +11,46 @@ import clsx from "clsx";
 
 export function RoadPalette() {
   const selected = useGame((s) => s.selected);
+  const eraseMode = useGame((s) => s.eraseMode);
   const rot = useGame((s) => s.rot);
   const setSelected = useGame((s) => s.setSelected);
+  const setEraseMode = useGame((s) => s.setEraseMode);
   const cycleRot = useGame((s) => s.cycleRot);
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const filteredRoads = useMemo(
+    () =>
+      ROAD_ORDER.filter((kind) => {
+        if (!normalizedQuery) return true;
+        const def = ROADS[kind];
+        return def.label.toLowerCase().includes(normalizedQuery) || def.hindi.toLowerCase().includes(normalizedQuery);
+      }),
+    [normalizedQuery],
+  );
+
+  const filteredBuildings = useMemo(
+    () =>
+      BUILDING_ORDER.filter((kind) => {
+        if (!normalizedQuery) return true;
+        const def = BUILDINGS[kind];
+        return def.label.toLowerCase().includes(normalizedQuery) || def.hindi.toLowerCase().includes(normalizedQuery);
+      }),
+    [normalizedQuery],
+  );
+
+  const filteredWaters = useMemo(
+    () =>
+      WATER_ORDER.filter((kind) => {
+        if (!normalizedQuery) return true;
+        const def = WATERS[kind];
+        return def.label.toLowerCase().includes(normalizedQuery) || def.hindi.toLowerCase().includes(normalizedQuery);
+      }),
+    [normalizedQuery],
+  );
+
+  const noResults = normalizedQuery && filteredRoads.length === 0 && filteredBuildings.length === 0 && filteredWaters.length === 0;
+
   const canRotate =
     selected?.type === "road"
       ? ROADS[selected.kind].rotatable
@@ -28,10 +65,26 @@ export function RoadPalette() {
         <span className="text-[10px] text-asphalt-500">Sadak, Bhavan, Pani</span>
       </div>
 
+      <div className="mb-2 shrink-0">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search city assets..."
+          className="w-full rounded-xl border-2 border-asphalt-200 bg-white px-3 py-1.5 text-sm text-asphalt-800 outline-none transition focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100"
+          aria-label="Search city assets"
+        />
+      </div>
+
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
+        {noResults && (
+          <div className="rounded-xl border-2 border-dashed border-asphalt-200 bg-asphalt-50 px-3 py-2 text-xs font-semibold text-asphalt-500">
+            No assets found for "{query.trim()}".
+          </div>
+        )}
+
         <Section label="Roads" hint="Sadak">
           <div className="grid grid-cols-2 gap-2">
-            {ROAD_ORDER.map((kind) => {
+            {filteredRoads.map((kind) => {
               const def = ROADS[kind];
               const active = selected?.type === "road" && selected.kind === kind;
               return (
@@ -41,21 +94,19 @@ export function RoadPalette() {
                   draggable
                   onDragStart={() => setSelected({ type: "road", kind })}
                   className={clsx(
-                    "relative flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition",
+                    "group relative flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition",
                     "hover:-translate-y-0.5 hover:shadow-tile",
-                    active
-                      ? "border-marigold-500 bg-marigold-400/15 shadow-tile"
-                      : "border-asphalt-200 bg-asphalt-50",
+                    "border-asphalt-200 bg-asphalt-50",
                   )}
-                  title={`${def.label} - ${def.hindi}`}
                 >
-                  <div className={clsx("rounded-md overflow-hidden", active && "ring-2 ring-marigold-500")}>
-                    <RoadTile kind={kind} rot={active ? rot : 0} size={56} />
+                  <div className="rounded-md overflow-hidden">
+                    <RoadTile kind={kind} rot={active ? rot : 0} size={56} outline={active ? "selected" : null} />
                   </div>
-                  <div className="text-[11px] font-semibold text-asphalt-700 text-center leading-tight">
+                  <div className="text-[13px] font-extrabold text-asphalt-800 text-center leading-snug">
                     {def.label}
                   </div>
-                  <div className="text-[10px] text-asphalt-500 leading-none">{def.hindi}</div>
+                  <div className="text-[11px] font-semibold text-asphalt-600 leading-snug">{def.hindi}</div>
+                  <AssetHoverTitle label={def.label} hindi={def.hindi} />
                 </button>
               );
             })}
@@ -64,7 +115,7 @@ export function RoadPalette() {
 
         <Section label="Buildings" hint="Bhavan">
           <div className="grid grid-cols-2 gap-2">
-            {BUILDING_ORDER.map((kind) => {
+            {filteredBuildings.map((kind) => {
               const def = BUILDINGS[kind];
               const active = selected?.type === "building" && selected.kind === kind;
               return (
@@ -74,21 +125,19 @@ export function RoadPalette() {
                   draggable
                   onDragStart={() => setSelected({ type: "building", kind })}
                   className={clsx(
-                    "relative flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition",
+                    "group relative flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition",
                     "hover:-translate-y-0.5 hover:shadow-tile",
-                    active
-                      ? "border-marigold-500 bg-marigold-400/15 shadow-tile"
-                      : "border-asphalt-200 bg-asphalt-50",
+                    "border-asphalt-200 bg-asphalt-50",
                   )}
-                  title={`${def.label} - ${def.hindi}`}
                 >
-                  <div className={clsx("rounded-md overflow-hidden", active && "ring-2 ring-marigold-500")}>
-                    <BuildingTile kind={kind} size={56} />
+                  <div className="rounded-md overflow-hidden">
+                    <BuildingTile kind={kind} size={56} outline={active ? "selected" : null} />
                   </div>
-                  <div className="text-[11px] font-semibold text-asphalt-700 text-center leading-tight">
+                  <div className="text-[13px] font-extrabold text-asphalt-800 text-center leading-snug">
                     {def.label}
                   </div>
-                  <div className="text-[10px] text-asphalt-500 leading-none">{def.hindi}</div>
+                  <div className="text-[11px] font-semibold text-asphalt-600 leading-snug">{def.hindi}</div>
+                  <AssetHoverTitle label={def.label} hindi={def.hindi} />
                 </button>
               );
             })}
@@ -97,7 +146,7 @@ export function RoadPalette() {
 
         <Section label="Water" hint="Pani">
           <div className="grid grid-cols-2 gap-2">
-            {WATER_ORDER.map((kind) => {
+            {filteredWaters.map((kind) => {
               const def = WATERS[kind];
               const active = selected?.type === "water" && selected.kind === kind;
               return (
@@ -107,17 +156,17 @@ export function RoadPalette() {
                   draggable
                   onDragStart={() => setSelected({ type: "water", kind })}
                   className={clsx(
-                    "relative flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition",
+                    "group relative flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition",
                     "hover:-translate-y-0.5 hover:shadow-tile",
-                    active ? "border-sky-500 bg-sky-400/15 shadow-tile" : "border-asphalt-200 bg-asphalt-50",
+                    "border-asphalt-200 bg-asphalt-50",
                   )}
-                  title={`${def.label} - ${def.hindi}`}
                 >
-                  <div className={clsx("rounded-md overflow-hidden", active && "ring-2 ring-sky-500")}>
-                    <WaterTile kind={kind} rot={active ? rot : 0} size={56} />
+                  <div className="rounded-md overflow-hidden">
+                    <WaterTile kind={kind} rot={active ? rot : 0} size={56} outline={active ? "selected" : null} />
                   </div>
-                  <div className="text-[11px] font-semibold text-asphalt-700 text-center leading-tight">{def.label}</div>
-                  <div className="text-[10px] text-asphalt-500 leading-none">{def.hindi}</div>
+                  <div className="text-[13px] font-extrabold text-asphalt-800 text-center leading-snug">{def.label}</div>
+                  <div className="text-[11px] font-semibold text-asphalt-600 leading-snug">{def.hindi}</div>
+                  <AssetHoverTitle label={def.label} hindi={def.hindi} />
                 </button>
               );
             })}
@@ -134,9 +183,22 @@ export function RoadPalette() {
         </button>
       )}
 
+      <button
+        onClick={() => setEraseMode(!eraseMode)}
+        className={clsx(
+          "mt-2 w-full rounded-xl border-2 py-1.5 text-sm font-bold shadow-tile active:translate-y-0.5 shrink-0 transition",
+          eraseMode
+            ? "border-red-500 bg-red-500 text-white hover:bg-red-600"
+            : "border-asphalt-200 bg-white text-asphalt-700 hover:bg-asphalt-50",
+        )}
+      >
+        {eraseMode ? "Eraser On" : "Eraser Off"}
+      </button>
+
       <div className="mt-2 text-[10px] text-asphalt-500 leading-snug shrink-0">
-        <div>- Left-click to place, right-click a tile to remove</div>
-        <div>- Right-click + drag to pan, <kbd className="px-1 bg-asphalt-100 rounded">R</kbd> to rotate</div>
+        <div>- Left-click to place tiles</div>
+        <div>- Turn on Eraser mode, then left-click a tile to remove</div>
+        <div>- Right-click tile to rotate, right-click + drag to pan</div>
       </div>
     </aside>
   );
@@ -155,5 +217,14 @@ function Section({ label, hint, children }: { label: string; hint: string; child
       </div>
       {children}
     </section>
+  );
+}
+
+function AssetHoverTitle({ label, hindi }: { label: string; hindi: string }) {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-1 z-30 w-max max-w-[220px] -translate-x-1/2 -translate-y-full rounded-xl border-2 border-asphalt-900 bg-white px-3 py-1.5 text-center opacity-0 shadow-pop transition group-hover:opacity-100">
+      <div className="text-sm font-extrabold leading-snug text-asphalt-900">{label}</div>
+      <div className="text-xs font-semibold leading-snug text-asphalt-600">{hindi}</div>
+    </div>
   );
 }

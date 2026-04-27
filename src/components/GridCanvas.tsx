@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { useGame } from "@/store/game";
 import { cellKey, parseKey, type Tile } from "@/lib/grid";
 import { BUILDINGS } from "@/lib/buildings";
@@ -22,10 +22,14 @@ const GRASS_LAYERS = [
 ];
 
 const GRASS_SIZES = "92px 92px, 116px 116px, 104px 104px, 130px 130px, 150px 150px, 144px 144px, 100% 100%, 100% 100%, 100% 100%";
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 1.8;
+const ZOOM_STEP = 0.1;
 
 export function GridCanvas() {
   const grid = useGame((s) => s.grid);
   const selected = useGame((s) => s.selected);
+  const eraseMode = useGame((s) => s.eraseMode);
   const rot = useGame((s) => s.rot);
   const placeTile = useGame((s) => s.placeTile);
   const removeTile = useGame((s) => s.removeTile);
@@ -41,7 +45,11 @@ export function GridCanvas() {
   const [draftName, setDraftName] = useState("");
   const [viewport, setViewport] = useState({ width: 960, height: 640 });
   const [camera, setCamera] = useState({ x: -6, y: -4 });
+  const [zoom, setZoom] = useState(1);
   const ref = useRef<HTMLDivElement>(null);
+  const tileSize = TILE_SIZE * zoom;
+
+  const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100));
 
   const focusCity = () => {
     if (grid.size === 0) return;
@@ -56,8 +64,8 @@ export function GridCanvas() {
     const cx = (minX + maxX + 1) / 2;
     const cy = (minY + maxY + 1) / 2;
     setCamera({
-      x: cx - viewport.width / (2 * TILE_SIZE),
-      y: cy - viewport.height / (2 * TILE_SIZE),
+      x: cx - viewport.width / (2 * tileSize),
+      y: cy - viewport.height / (2 * tileSize),
     });
   };
   const panRef = useRef<{ startX: number; startY: number; startCamX: number; startCamY: number; moved: boolean } | null>(null);
@@ -79,33 +87,13 @@ export function GridCanvas() {
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const isTypingTarget =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
-
-      if (isTypingTarget) return;
-      if (e.code !== "KeyR" && e.key.toLowerCase() !== "r") return;
-
-      e.preventDefault();
-      if (hover && grid.has(cellKey(hover.x, hover.y))) rotateTile(hover.x, hover.y);
-      else cycleRot();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [hover, grid, rotateTile, cycleRot]);
-
-  useEffect(() => {
     if (!focusTarget) return;
     setCamera({
-      x: focusTarget.x + 0.5 - viewport.width / (2 * TILE_SIZE),
-      y: focusTarget.y + 0.5 - viewport.height / (2 * TILE_SIZE),
+      x: focusTarget.x + 0.5 - viewport.width / (2 * tileSize),
+      y: focusTarget.y + 0.5 - viewport.height / (2 * tileSize),
     });
     setFocusTarget(null);
-  }, [focusTarget, setFocusTarget, viewport]);
+  }, [focusTarget, setFocusTarget, viewport, tileSize]);
 
   const activeCloud = (() => {
     if (editingKey) {
@@ -119,8 +107,8 @@ export function GridCanvas() {
     return tile ? { x: hover.x, y: hover.y, key, tile } : null;
   })();
 
-  const pixelOffsetX = -((camera.x * TILE_SIZE) % 144);
-  const pixelOffsetY = -((camera.y * TILE_SIZE) % 144);
+  const pixelOffsetX = -((camera.x * tileSize) % 144);
+  const pixelOffsetY = -((camera.y * tileSize) % 144);
 
   const cellAt = (clientX: number, clientY: number) => {
     const el = ref.current;
@@ -129,14 +117,14 @@ export function GridCanvas() {
     const localX = clientX - r.left;
     const localY = clientY - r.top;
     return {
-      x: Math.floor(localX / TILE_SIZE + camera.x),
-      y: Math.floor(localY / TILE_SIZE + camera.y),
+      x: Math.floor(localX / tileSize + camera.x),
+      y: Math.floor(localY / tileSize + camera.y),
     };
   };
 
   const screenPos = (x: number, y: number) => ({
-    left: (x - camera.x) * TILE_SIZE,
-    top: (y - camera.y) * TILE_SIZE,
+    left: (x - camera.x) * tileSize,
+    top: (y - camera.y) * tileSize,
   });
 
   const startPan = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -149,14 +137,14 @@ export function GridCanvas() {
       moved: false,
     };
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: globalThis.MouseEvent) => {
       if (!panRef.current) return;
       const rawDx = ev.clientX - panRef.current.startX;
       const rawDy = ev.clientY - panRef.current.startY;
       if (Math.abs(rawDx) > 3 || Math.abs(rawDy) > 3) panRef.current.moved = true;
       setCamera({
-        x: panRef.current.startCamX - rawDx / TILE_SIZE,
-        y: panRef.current.startCamY - rawDy / TILE_SIZE,
+        x: panRef.current.startCamX - rawDx / tileSize,
+        y: panRef.current.startCamY - rawDy / tileSize,
       });
     };
 
@@ -170,6 +158,28 @@ export function GridCanvas() {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return true;
+  };
+
+  const zoomAroundPoint = (nextZoom: number, clientX?: number, clientY?: number) => {
+    const el = ref.current;
+    const clamped = clampZoom(nextZoom);
+    if (!el || clamped === zoom) {
+      setZoom(clamped);
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const localX = clientX === undefined ? viewport.width / 2 : clientX - rect.left;
+    const localY = clientY === undefined ? viewport.height / 2 : clientY - rect.top;
+    const worldX = localX / tileSize + camera.x;
+    const worldY = localY / tileSize + camera.y;
+    const nextTileSize = TILE_SIZE * clamped;
+
+    setZoom(clamped);
+    setCamera({
+      x: worldX - localX / nextTileSize,
+      y: worldY - localY / nextTileSize,
+    });
   };
 
   return (
@@ -201,7 +211,12 @@ export function GridCanvas() {
       }}
       onClick={(e) => {
         const c = cellAt(e.clientX, e.clientY);
-        if (!c || !selected) return;
+        if (!c) return;
+        if (eraseMode) {
+          if (grid.has(cellKey(c.x, c.y))) removeTile(c.x, c.y);
+          return;
+        }
+        if (!selected) return;
         placeTile(c.x, c.y);
       }}
       onContextMenu={(e) => {
@@ -210,9 +225,11 @@ export function GridCanvas() {
           justPannedRef.current = false;
           return;
         }
+        if (eraseMode) return;
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
-        if (grid.has(cellKey(c.x, c.y))) removeTile(c.x, c.y);
+        if (grid.has(cellKey(c.x, c.y))) rotateTile(c.x, c.y);
+        else cycleRot();
       }}
       onDragOver={(e) => {
         e.preventDefault();
@@ -224,21 +241,26 @@ export function GridCanvas() {
         if (!c) return;
         placeTile(c.x, c.y);
       }}
+      onWheel={(e) => {
+        e.preventDefault();
+        const direction = e.deltaY > 0 ? -1 : 1;
+        zoomAroundPoint(zoom + direction * ZOOM_STEP, e.clientX, e.clientY);
+      }}
     >
       <div
         className="absolute inset-0 pointer-events-none opacity-20"
         style={{
           backgroundImage:
             "linear-gradient(to right, rgba(15,23,42,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.08) 1px, transparent 1px)",
-          backgroundSize: `${TILE_SIZE}px ${TILE_SIZE}px`,
-          backgroundPosition: `${-(camera.x * TILE_SIZE)}px ${-(camera.y * TILE_SIZE)}px`,
+          backgroundSize: `${tileSize}px ${tileSize}px`,
+          backgroundPosition: `${-(camera.x * tileSize)}px ${-(camera.y * tileSize)}px`,
         }}
       />
 
       {[...grid.entries()].map(([k, t]) => {
         const [x, y] = parseKey(k);
         const pos = screenPos(x, y);
-        if (pos.left < -TILE_SIZE || pos.top < -TILE_SIZE || pos.left > viewport.width || pos.top > viewport.height) {
+        if (pos.left < -tileSize || pos.top < -tileSize || pos.left > viewport.width || pos.top > viewport.height) {
           return null;
         }
 
@@ -251,14 +273,14 @@ export function GridCanvas() {
           <div
             key={k}
             className={`absolute ${pulse ? "animate-pulseJoin" : ""} ${shake ? "animate-shake" : ""}`}
-            style={{ left: pos.left, top: pos.top, width: TILE_SIZE, height: TILE_SIZE }}
+            style={{ left: pos.left, top: pos.top, width: tileSize, height: tileSize }}
           >
             {t.type === "road" ? (
-              <RoadTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} />
+              <RoadTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} size={tileSize} />
             ) : t.type === "water" ? (
-              <WaterTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} />
+              <WaterTile kind={t.kind} rot={t.rot} outline={named ? "named" : null} size={tileSize} />
             ) : (
-              <BuildingTile kind={t.kind} outline={named ? "named" : null} />
+              <BuildingTile kind={t.kind} outline={named ? "named" : null} size={tileSize} />
             )}
             {named && (
               <div className="absolute -top-4 left-0 right-0 flex justify-center pointer-events-none">
@@ -271,19 +293,19 @@ export function GridCanvas() {
         );
       })}
 
-      {hover && selected && !panRef.current && !grid.has(cellKey(hover.x, hover.y)) && (() => {
+      {hover && selected && !eraseMode && !panRef.current && !grid.has(cellKey(hover.x, hover.y)) && (() => {
         const pos = screenPos(hover.x, hover.y);
         return (
           <div
             className="absolute pointer-events-none opacity-60"
-            style={{ left: pos.left, top: pos.top, width: TILE_SIZE, height: TILE_SIZE }}
+            style={{ left: pos.left, top: pos.top, width: tileSize, height: tileSize }}
           >
             {selected.type === "road" ? (
-              <RoadTile kind={selected.kind} rot={rot} outline="hover" />
+              <RoadTile kind={selected.kind} rot={rot} outline="hover" size={tileSize} />
             ) : selected.type === "water" ? (
-              <WaterTile kind={selected.kind} rot={rot} outline="hover" />
+              <WaterTile kind={selected.kind} rot={rot} outline="hover" size={tileSize} />
             ) : (
-              <BuildingTile kind={selected.kind} outline="hover" />
+              <BuildingTile kind={selected.kind} outline="hover" size={tileSize} />
             )}
           </div>
         );
@@ -293,6 +315,7 @@ export function GridCanvas() {
         <TileNameCloud
           screenX={screenPos(activeCloud.x, activeCloud.y).left}
           screenY={screenPos(activeCloud.x, activeCloud.y).top}
+          tileSize={tileSize}
           viewportWidth={viewport.width}
           name={activeCloud.tile.name || getTileLabel(activeCloud.tile)}
           hindi={getTileHindi(activeCloud.tile)}
@@ -315,19 +338,57 @@ export function GridCanvas() {
         />
       )}
 
-      {grid.size > 0 && (
-        <button
-          onClick={(e) => { e.stopPropagation(); focusCity(); }}
-          className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border-2 border-asphalt-900 bg-white/90 px-3 py-1 text-[11px] font-bold text-asphalt-700 shadow-tile backdrop-blur hover:-translate-y-0.5 hover:bg-marigold-400/20 active:translate-y-0 transition"
-          title="Find my city"
-        >
-          <LocateIcon />
-          Find City
-        </button>
-      )}
+      <div className="absolute bottom-3 left-3 flex items-center gap-2">
+        {grid.size > 0 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              focusCity();
+            }}
+            className="flex items-center gap-1.5 rounded-full border-2 border-asphalt-900 bg-white/90 px-3 py-1 text-[11px] font-bold text-asphalt-700 shadow-tile backdrop-blur hover:-translate-y-0.5 hover:bg-marigold-400/20 active:translate-y-0 transition"
+            title="Find my city"
+          >
+            <LocateIcon />
+            Find City
+          </button>
+        )}
+
+        <div className="flex items-center gap-1 rounded-full border-2 border-asphalt-900 bg-white/90 px-1.5 py-1 shadow-tile backdrop-blur">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomAroundPoint(zoom - ZOOM_STEP);
+            }}
+            className="grid h-6 w-6 place-items-center rounded-full border border-asphalt-300 text-sm font-black text-asphalt-700 hover:bg-asphalt-100"
+            title="Zoom out"
+          >
+            -
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomAroundPoint(1);
+            }}
+            className="min-w-[48px] rounded-full border border-asphalt-300 px-2 py-0.5 text-[10px] font-extrabold text-asphalt-700 hover:bg-asphalt-100"
+            title="Reset zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomAroundPoint(zoom + ZOOM_STEP);
+            }}
+            className="grid h-6 w-6 place-items-center rounded-full border border-asphalt-300 text-sm font-black text-asphalt-700 hover:bg-asphalt-100"
+            title="Zoom in"
+          >
+            +
+          </button>
+        </div>
+      </div>
 
       <div className="absolute bottom-3 right-3 rounded-full border-2 border-asphalt-900 bg-white/80 px-3 py-1 text-[11px] font-bold text-asphalt-700 backdrop-blur">
-        Right-click + drag to pan · Right-click a tile to remove
+        Right-click tile to rotate | Right-click + drag to pan | Mouse wheel to zoom
       </div>
     </div>
   );
@@ -356,6 +417,7 @@ function getTileHindi(tile: Tile) {
 function TileNameCloud({
   screenX,
   screenY,
+  tileSize,
   viewportWidth,
   name,
   hindi,
@@ -368,6 +430,7 @@ function TileNameCloud({
 }: {
   screenX: number;
   screenY: number;
+  tileSize: number;
   viewportWidth: number;
   name: string;
   hindi: string;
@@ -378,11 +441,11 @@ function TileNameCloud({
   onCancel: () => void;
   onSave: () => void;
 }) {
-  const below = screenY < 60;
-  const left = Math.min(Math.max(screenX + TILE_SIZE / 2 - 88, 8), viewportWidth - 192);
-  const top = below ? screenY + TILE_SIZE - 2 : screenY - 54;
+  const below = screenY < tileSize * 0.9;
+  const left = Math.min(Math.max(screenX + tileSize / 2 - 88, 8), viewportWidth - 192);
+  const top = below ? screenY + tileSize - 2 : screenY - 54;
 
-  const stop = (e: MouseEvent) => {
+  const stop = (e: ReactMouseEvent) => {
     e.stopPropagation();
   };
 
@@ -452,3 +515,4 @@ function TileNameCloud({
     </div>
   );
 }
+

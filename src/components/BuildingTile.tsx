@@ -1,4 +1,5 @@
 "use client";
+import { useId } from "react";
 import { BUILDINGS, type BuildingKind } from "@/lib/buildings";
 
 const S = 72;
@@ -384,6 +385,21 @@ function Civic({ court = false }: { court?: boolean }) {
   );
 }
 
+function ClockTower() {
+  return (
+    <g>
+      <ellipse cx={36} cy={62} rx={20} ry={4} fill={SHADOW} />
+      <rect x={24} y={23} width={24} height={34} rx={3} fill="#FDE68A" stroke={EDGE} strokeWidth={2} />
+      <path d="M22 24 L36 9 L50 24 Z" fill="#B45309" stroke={EDGE} strokeWidth={2} />
+      <rect x={31} y={13} width={10} height={7} rx={2} fill="#F59E0B" stroke={EDGE} strokeWidth={1.4} />
+      <circle cx={36} cy={36} r={8} fill={WHITE} stroke={EDGE} strokeWidth={1.7} />
+      <line x1={36} y1={36} x2={36} y2={31} stroke="#0F172A" strokeWidth={1.8} strokeLinecap="round" />
+      <line x1={36} y1={36} x2={40} y2={38} stroke="#0F172A" strokeWidth={1.8} strokeLinecap="round" />
+      <rect x={31} y={46} width={10} height={11} rx={1.8} fill="#B45309" stroke={EDGE} strokeWidth={1.2} />
+    </g>
+  );
+}
+
 function CommunityHall() {
   return (
     <g>
@@ -494,6 +510,8 @@ function TileArt({ kind }: { kind: BuildingKind }) {
       return <WaterTank />;
     case "government_office":
       return <Civic />;
+    case "clocktower":
+      return <ClockTower />;
     case "court":
       return <Civic court />;
     case "community_hall":
@@ -509,19 +527,35 @@ function TileArt({ kind }: { kind: BuildingKind }) {
   }
 }
 
-export function BuildingTile({ kind, size = S, outline }: { kind: BuildingKind; size?: number; outline?: "ok" | "bad" | "hover" | "named" | null }) {
+export function BuildingTile({ kind, size = S, outline }: { kind: BuildingKind; size?: number; outline?: "ok" | "bad" | "hover" | "named" | "selected" | null }) {
   const outlineColor =
     outline === "ok" ? "#10B981" : outline === "bad" ? "#EF4444" : outline === "hover" ? "#F59E0B" : outline === "named" ? "#A855F7" : null;
   const def = BUILDINGS[kind];
+  const glowId = useId();
+  const glowUrl = outline === "selected" ? `url(#${glowId})` : undefined;
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${S} ${S}`} style={{ display: "block" }}>
-      <TileArt kind={kind} />
+      {outline === "selected" && <TileGlow id={glowId} />}
+      <g filter={glowUrl}>
+        <TileArt kind={kind} />
+      </g>
       {outlineColor && (
         <rect x={1} y={1} width={S - 2} height={S - 2} fill="none" stroke={outlineColor} strokeWidth={3} rx={6} style={{ pointerEvents: "none" }} />
       )}
       {outline === "named" && <circle cx={60} cy={12} r={5} fill="#FDE047" stroke="#0F172A" strokeWidth={1.5} />}
       <title>{def.label}</title>
     </svg>
+  );
+}
+
+function TileGlow({ id }: { id: string }) {
+  return (
+    <defs>
+      <filter id={id} x="-35%" y="-35%" width="170%" height="170%" colorInterpolationFilters="sRGB">
+        <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#F59E0B" floodOpacity="0.95" />
+        <feDropShadow dx="0" dy="0" stdDeviation="5.8" floodColor="#F59E0B" floodOpacity="0.62" />
+      </filter>
+    </defs>
   );
 }

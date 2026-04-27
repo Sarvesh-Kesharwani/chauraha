@@ -23,6 +23,7 @@ export type BuildingKind =
   | "park"
   | "water_tank"
   | "government_office"
+  | "clocktower"
   | "court"
   | "community_hall"
   | "cinema"
@@ -64,6 +65,7 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   park: { kind: "park", label: "Park", hindi: "Bagicha", color: "#BBF7D0", accent: "#15803D", icon: "Park" },
   water_tank: { kind: "water_tank", label: "Water Tank", hindi: "Pani Tanki", color: "#DBEAFE", accent: "#0284C7", icon: "WT" },
   government_office: { kind: "government_office", label: "Govt Office", hindi: "Sarkari Daftar", color: "#FEF9C3", accent: "#A16207", icon: "Gov" },
+  clocktower: { kind: "clocktower", label: "Clock Tower", hindi: "Ghanta Ghar", color: "#FDE68A", accent: "#B45309", icon: "CT" },
   court: { kind: "court", label: "Court", hindi: "Nyayalaya", color: "#F3E8FF", accent: "#9333EA", icon: "Law" },
   community_hall: { kind: "community_hall", label: "Community Hall", hindi: "Samudayik Bhavan", color: "#FCE7F3", accent: "#BE185D", icon: "Hall" },
   cinema: { kind: "cinema", label: "Cinema", hindi: "Cinema", color: "#FAE8FF", accent: "#A21CAF", icon: "Film" },
@@ -97,6 +99,7 @@ export const BUILDING_ORDER: BuildingKind[] = [
   "park",
   "water_tank",
   "government_office",
+  "clocktower",
   "court",
   "community_hall",
   "cinema",
