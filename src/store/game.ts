@@ -35,6 +35,7 @@ type State = {
   activeMapId: string;
   grid: GridMap;
   selected: SelectedTool | null;
+  eraseMode: boolean;
   rot: Rot;
   feedback: Feedback;
   focusTarget: FocusTarget;
@@ -44,6 +45,7 @@ type State = {
   rotateTile: (x: number, y: number) => void;
   renameTile: (x: number, y: number, name: string) => void;
   setSelected: (tool: SelectedTool | null) => void;
+  setEraseMode: (enabled: boolean) => void;
   cycleRot: () => void;
   clearAll: () => void;
   hydrateSnapshot: (snapshot: GameSnapshot) => void;
@@ -63,11 +65,13 @@ export const useGame = create<State>((set, get) => ({
   activeMapId: DEFAULT_MAP.id,
   grid: new Map(),
   selected: { type: "road", kind: "straight" },
+  eraseMode: false,
   rot: 0,
   feedback: null,
   focusTarget: null,
 
-  setSelected: (k) => set({ selected: k }),
+  setSelected: (k) => set({ selected: k, eraseMode: false }),
+  setEraseMode: (enabled) => set({ eraseMode: enabled }),
   setFocusTarget: (t) => set({ focusTarget: t }),
   cycleRot: () => set((s) => ({ rot: (((s.rot + 1) % 4) as Rot) })),
 
@@ -135,6 +139,7 @@ export const useGame = create<State>((set, get) => ({
         activeMapId: activeId,
         grid: new Map(activeMap.grid),
         selected: snapshot.selected,
+        eraseMode: false,
         rot: snapshot.rot,
         feedback: null,
       });
@@ -144,6 +149,7 @@ export const useGame = create<State>((set, get) => ({
       set({
         grid: newGrid,
         selected: snapshot.selected,
+        eraseMode: false,
         rot: snapshot.rot,
         feedback: null,
         maps: syncGrid(maps, activeMapId, newGrid),
@@ -191,7 +197,15 @@ export const useGame = create<State>((set, get) => ({
       window.sessionStorage.removeItem("chowkcraft_drive_pulled");
     }
     const fresh: MapEntry = { id: "default", name: "My City", grid: new Map() };
-    set({ maps: [fresh], activeMapId: fresh.id, grid: new Map(), selected: { type: "road", kind: "straight" }, rot: 0, feedback: null });
+    set({
+      maps: [fresh],
+      activeMapId: fresh.id,
+      grid: new Map(),
+      selected: { type: "road", kind: "straight" },
+      eraseMode: false,
+      rot: 0,
+      feedback: null,
+    });
   },
 }));
 

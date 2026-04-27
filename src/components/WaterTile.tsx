@@ -1,4 +1,5 @@
 "use client";
+import { useId } from "react";
 import type { WaterKind } from "@/lib/water";
 
 const S = 72;
@@ -92,7 +93,7 @@ function WaterArt({ kind }: { kind: WaterKind }) {
   }
 }
 
-export function WaterTile({ kind, rot, size = S, outline }: { kind: WaterKind; rot: 0 | 1 | 2 | 3; size?: number; outline?: "ok" | "bad" | "hover" | "named" | null }) {
+export function WaterTile({ kind, rot, size = S, outline }: { kind: WaterKind; rot: 0 | 1 | 2 | 3; size?: number; outline?: "ok" | "bad" | "hover" | "named" | "selected" | null }) {
   const outlineColor =
     outline === "ok"
       ? "#10B981"
@@ -103,14 +104,28 @@ export function WaterTile({ kind, rot, size = S, outline }: { kind: WaterKind; r
           : outline === "named"
             ? "#A855F7"
             : null;
+  const glowId = useId();
+  const glowUrl = outline === "selected" ? `url(#${glowId})` : undefined;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${S} ${S}`} style={{ display: "block" }}>
-      <g transform={`rotate(${rot * 90} ${H} ${H})`}>
+      {outline === "selected" && <TileGlow id={glowId} />}
+      <g transform={`rotate(${rot * 90} ${H} ${H})`} filter={glowUrl}>
         <WaterArt kind={kind} />
       </g>
       {outlineColor && <rect x={1} y={1} width={S - 2} height={S - 2} fill="none" stroke={outlineColor} strokeWidth={3} rx={6} style={{ pointerEvents: "none" }} />}
       {outline === "named" && <circle cx={60} cy={12} r={5} fill="#FDE047" stroke="#0F172A" strokeWidth={1.5} />}
       <title>{kind}</title>
     </svg>
+  );
+}
+
+function TileGlow({ id }: { id: string }) {
+  return (
+    <defs>
+      <filter id={id} x="-35%" y="-35%" width="170%" height="170%" colorInterpolationFilters="sRGB">
+        <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#F59E0B" floodOpacity="0.95" />
+        <feDropShadow dx="0" dy="0" stdDeviation="5.8" floodColor="#F59E0B" floodOpacity="0.62" />
+      </filter>
+    </defs>
   );
 }
