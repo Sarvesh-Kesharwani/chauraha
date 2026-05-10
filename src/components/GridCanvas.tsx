@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { useGame } from "@/store/game";
+import { useGame, type SelectedTool } from "@/store/game";
 import { cellKey, parseKey, type Tile } from "@/lib/grid";
 import { BUILDINGS } from "@/lib/buildings";
 import { ROADS } from "@/lib/roads";
@@ -30,6 +30,12 @@ export function GridCanvas() {
   const grid = useGame((s) => s.grid);
   const selected = useGame((s) => s.selected);
   const eraseMode = useGame((s) => s.eraseMode);
+  const selectMode = useGame((s) => s.selectMode);
+  const selectedKeys = useGame((s) => s.selectedKeys);
+  const setSelectMode = useGame((s) => s.setSelectMode);
+  const toggleSelectKey = useGame((s) => s.toggleSelectKey);
+  const clearSelectedKeys = useGame((s) => s.clearSelectedKeys);
+  const moveSelectedTiles = useGame((s) => s.moveSelectedTiles);
   const rot = useGame((s) => s.rot);
   const placeTile = useGame((s) => s.placeTile);
   const removeTile = useGame((s) => s.removeTile);
@@ -46,6 +52,23 @@ export function GridCanvas() {
   const [viewport, setViewport] = useState({ width: 960, height: 640 });
   const [camera, setCamera] = useState({ x: -6, y: -4 });
   const [zoom, setZoom] = useState(1);
+  const [moving, setMoving] = useState(false);
+
+  const selectionAnchor = (() => {
+    if (selectedKeys.size === 0) return null;
+    let minX = Infinity, minY = Infinity;
+    for (const k of selectedKeys) {
+      const [x, y] = parseKey(k);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+    }
+    return { x: minX, y: minY };
+  })();
+
+  const moveOffset = (() => {
+    if (!moving || !hover || !selectionAnchor) return null;
+    return { dx: hover.x - selectionAnchor.x, dy: hover.y - selectionAnchor.y };
+  })();
   const ref = useRef<HTMLDivElement>(null);
   const tileSize = TILE_SIZE * zoom;
 
@@ -85,6 +108,10 @@ export function GridCanvas() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!selectMode || selectedKeys.size === 0) setMoving(false);
+  }, [selectMode, selectedKeys]);
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -182,6 +209,42 @@ export function GridCanvas() {
     });
   };
 
+  const confirmReplaceTile = (x: number, y: number) => {
+    if (!selected) return false;
+    const existing = grid.get(cellKey(x, y));
+    if (!existing) return true;
+
+    return window.confirm(
+      `Replace ${getTileLabel(existing)} with ${getSelectedToolLabel(selected)}?`
+    );
+  };
+
+  const commitMove = (dx: number, dy: number) => {
+    if (selectedKeys.size === 0) return;
+    if (dx === 0 && dy === 0) {
+      setMoving(false);
+      return;
+    }
+    const collisions: Array<{ key: string; tile: Tile }> = [];
+    for (const k of selectedKeys) {
+      const [x, y] = parseKey(k);
+      const nk = cellKey(x + dx, y + dy);
+      if (selectedKeys.has(nk)) continue;
+      const existing = grid.get(nk);
+      if (existing) collisions.push({ key: nk, tile: existing });
+    }
+    if (collisions.length > 0) {
+      const labels = collisions.slice(0, 5).map((c) => getTileLabel(c.tile)).join(", ");
+      const more = collisions.length > 5 ? ` and ${collisions.length - 5} more` : "";
+      const ok = window.confirm(
+        `Do you want to replace the items below moving group of items?\n\n${collisions.length} tile(s): ${labels}${more}`
+      );
+      if (!ok) return;
+    }
+    moveSelectedTiles(dx, dy, true);
+    setMoving(false);
+  };
+
   return (
     <div
       ref={ref}
@@ -212,11 +275,20 @@ export function GridCanvas() {
       onClick={(e) => {
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
+        if (moving && selectionAnchor) {
+          commitMove(c.x - selectionAnchor.x, c.y - selectionAnchor.y);
+          return;
+        }
+        if (selectMode) {
+          toggleSelectKey(c.x, c.y);
+          return;
+        }
         if (eraseMode) {
           if (grid.has(cellKey(c.x, c.y))) removeTile(c.x, c.y);
           return;
         }
         if (!selected) return;
+        if (!confirmReplaceTile(c.x, c.y)) return;
         placeTile(c.x, c.y);
       }}
       onContextMenu={(e) => {
@@ -225,7 +297,7 @@ export function GridCanvas() {
           justPannedRef.current = false;
           return;
         }
-        if (eraseMode) return;
+        if (eraseMode || selectMode) return;
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
         if (grid.has(cellKey(c.x, c.y))) rotateTile(c.x, c.y);
@@ -237,8 +309,10 @@ export function GridCanvas() {
       }}
       onDrop={(e) => {
         e.preventDefault();
+        if (selectMode) return;
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
+        if (!confirmReplaceTile(c.x, c.y)) return;
         placeTile(c.x, c.y);
       }}
       onWheel={(e) => {
@@ -293,7 +367,53 @@ export function GridCanvas() {
         );
       })}
 
-      {hover && selected && !eraseMode && !panRef.current && !grid.has(cellKey(hover.x, hover.y)) && (() => {
+      {[...selectedKeys].map((k) => {
+        const [x, y] = parseKey(k);
+        const pos = screenPos(x, y);
+        if (pos.left < -tileSize || pos.top < -tileSize || pos.left > viewport.width || pos.top > viewport.height) {
+          return null;
+        }
+        return (
+          <div
+            key={`sel-${k}`}
+            className="absolute pointer-events-none rounded-md ring-[3px] ring-cyan-400 ring-inset bg-cyan-300/20"
+            style={{ left: pos.left, top: pos.top, width: tileSize, height: tileSize, zIndex: 5 }}
+          />
+        );
+      })}
+
+      {moving && moveOffset && [...selectedKeys].map((k) => {
+        const t = grid.get(k);
+        if (!t) return null;
+        const [x, y] = parseKey(k);
+        const gx = x + moveOffset.dx;
+        const gy = y + moveOffset.dy;
+        const pos = screenPos(gx, gy);
+        if (pos.left < -tileSize || pos.top < -tileSize || pos.left > viewport.width || pos.top > viewport.height) {
+          return null;
+        }
+        const collides = !selectedKeys.has(cellKey(gx, gy)) && grid.has(cellKey(gx, gy));
+        return (
+          <div
+            key={`ghost-${k}`}
+            className="absolute pointer-events-none opacity-70"
+            style={{ left: pos.left, top: pos.top, width: tileSize, height: tileSize, zIndex: 6 }}
+          >
+            {t.type === "road" ? (
+              <RoadTile kind={t.kind} rot={t.rot} outline={null} size={tileSize} />
+            ) : t.type === "water" ? (
+              <WaterTile kind={t.kind} rot={t.rot} outline={null} size={tileSize} />
+            ) : (
+              <BuildingTile kind={t.kind} outline={null} size={tileSize} />
+            )}
+            <div
+              className={`absolute inset-0 rounded-md ring-[3px] ring-inset ${collides ? "ring-rose-500 bg-rose-400/30" : "ring-emerald-400 bg-emerald-300/20"}`}
+            />
+          </div>
+        );
+      })}
+
+      {hover && selected && !eraseMode && !selectMode && !panRef.current && !grid.has(cellKey(hover.x, hover.y)) && (() => {
         const pos = screenPos(hover.x, hover.y);
         return (
           <div
@@ -338,6 +458,54 @@ export function GridCanvas() {
         />
       )}
 
+      {selectMode && (
+        <div
+          className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border-2 border-asphalt-900 bg-white/95 px-3 py-1.5 shadow-tile backdrop-blur z-20"
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <span className="text-[11px] font-extrabold text-asphalt-700">
+            {moving
+              ? "Click destination to drop"
+              : `${selectedKeys.size} selected${selectedKeys.size === 0 ? " — click tiles to add" : ""}`}
+          </span>
+          {selectedKeys.size > 0 && !moving && (
+            <button
+              onClick={() => setMoving(true)}
+              className="rounded-full border-2 border-asphalt-900 bg-cyan-300 px-2.5 py-0.5 text-[11px] font-extrabold text-asphalt-950 shadow-tile hover:-translate-y-0.5 transition"
+            >
+              Move
+            </button>
+          )}
+          {moving && (
+            <button
+              onClick={() => setMoving(false)}
+              className="rounded-full border-2 border-asphalt-900 bg-white px-2.5 py-0.5 text-[11px] font-bold text-asphalt-900 hover:bg-rose-100"
+            >
+              Cancel move
+            </button>
+          )}
+          {selectedKeys.size > 0 && !moving && (
+            <button
+              onClick={() => clearSelectedKeys()}
+              className="rounded-full border-2 border-asphalt-900 bg-white px-2.5 py-0.5 text-[11px] font-bold text-asphalt-900 hover:bg-rose-100"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setMoving(false);
+              setSelectMode(false);
+            }}
+            className="rounded-full border-2 border-asphalt-900 bg-white px-2.5 py-0.5 text-[11px] font-bold text-asphalt-900 hover:bg-asphalt-100"
+          >
+            Exit
+          </button>
+        </div>
+      )}
+
       <div className="absolute bottom-3 left-3 flex items-center gap-2">
         {grid.size > 0 && (
           <button
@@ -352,6 +520,20 @@ export function GridCanvas() {
             Find City
           </button>
         )}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectMode(!selectMode);
+          }}
+          className={`flex items-center gap-1.5 rounded-full border-2 border-asphalt-900 px-3 py-1 text-[11px] font-bold shadow-tile backdrop-blur transition hover:-translate-y-0.5 ${
+            selectMode ? "bg-cyan-300 text-asphalt-950" : "bg-white/90 text-asphalt-700 hover:bg-cyan-100"
+          }`}
+          title="Select multiple tiles"
+        >
+          <SelectIcon />
+          {selectMode ? "Selecting" : "Select"}
+        </button>
 
         <div className="flex items-center gap-1 rounded-full border-2 border-asphalt-900 bg-white/90 px-1.5 py-1 shadow-tile backdrop-blur">
           <button
@@ -369,7 +551,7 @@ export function GridCanvas() {
               e.stopPropagation();
               zoomAroundPoint(1);
             }}
-            className="min-w-[48px] rounded-full border border-asphalt-300 px-2 py-0.5 text-[10px] font-extrabold text-asphalt-700 hover:bg-asphalt-100"
+            className="min-w-[56px] rounded-full border border-asphalt-300 px-2.5 py-0.5 text-[11px] font-extrabold text-asphalt-700 tabular-nums hover:bg-asphalt-100"
             title="Reset zoom"
           >
             {Math.round(zoom * 100)}%
@@ -394,6 +576,17 @@ export function GridCanvas() {
   );
 }
 
+function SelectIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
 function LocateIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -412,6 +605,10 @@ function getTileLabel(tile: Tile) {
 
 function getTileHindi(tile: Tile) {
   return tile.type === "road" ? ROADS[tile.kind].hindi : tile.type === "water" ? WATERS[tile.kind].hindi : BUILDINGS[tile.kind].hindi;
+}
+
+function getSelectedToolLabel(tool: SelectedTool) {
+  return tool.type === "road" ? ROADS[tool.kind].label : tool.type === "water" ? WATERS[tool.kind].label : BUILDINGS[tool.kind].label;
 }
 
 function TileNameCloud({

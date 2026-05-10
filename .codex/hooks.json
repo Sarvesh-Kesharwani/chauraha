@@ -10,6 +10,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .codex/scripts/commit-and-push-on-stop.ps1"
+          }
+        ]
+      }
     ]
   }
 }
