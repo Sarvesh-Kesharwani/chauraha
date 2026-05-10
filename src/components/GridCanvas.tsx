@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { useGame } from "@/store/game";
+import { useGame, type SelectedTool } from "@/store/game";
 import { cellKey, parseKey, type Tile } from "@/lib/grid";
 import { BUILDINGS } from "@/lib/buildings";
 import { ROADS } from "@/lib/roads";
@@ -182,6 +182,16 @@ export function GridCanvas() {
     });
   };
 
+  const confirmReplaceTile = (x: number, y: number) => {
+    if (!selected) return false;
+    const existing = grid.get(cellKey(x, y));
+    if (!existing) return true;
+
+    return window.confirm(
+      `Replace ${getTileLabel(existing)} with ${getSelectedToolLabel(selected)}?`
+    );
+  };
+
   return (
     <div
       ref={ref}
@@ -217,6 +227,7 @@ export function GridCanvas() {
           return;
         }
         if (!selected) return;
+        if (!confirmReplaceTile(c.x, c.y)) return;
         placeTile(c.x, c.y);
       }}
       onContextMenu={(e) => {
@@ -239,6 +250,7 @@ export function GridCanvas() {
         e.preventDefault();
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
+        if (!confirmReplaceTile(c.x, c.y)) return;
         placeTile(c.x, c.y);
       }}
       onWheel={(e) => {
@@ -369,7 +381,7 @@ export function GridCanvas() {
               e.stopPropagation();
               zoomAroundPoint(1);
             }}
-            className="min-w-[48px] rounded-full border border-asphalt-300 px-2 py-0.5 text-[10px] font-extrabold text-asphalt-700 hover:bg-asphalt-100"
+            className="min-w-[56px] rounded-full border border-asphalt-300 px-2.5 py-0.5 text-[11px] font-extrabold text-asphalt-700 tabular-nums hover:bg-asphalt-100"
             title="Reset zoom"
           >
             {Math.round(zoom * 100)}%
@@ -412,6 +424,10 @@ function getTileLabel(tile: Tile) {
 
 function getTileHindi(tile: Tile) {
   return tile.type === "road" ? ROADS[tile.kind].hindi : tile.type === "water" ? WATERS[tile.kind].hindi : BUILDINGS[tile.kind].hindi;
+}
+
+function getSelectedToolLabel(tool: SelectedTool) {
+  return tool.type === "road" ? ROADS[tool.kind].label : tool.type === "water" ? WATERS[tool.kind].label : BUILDINGS[tool.kind].label;
 }
 
 function TileNameCloud({
