@@ -36,6 +36,8 @@ type State = {
   grid: GridMap;
   selected: SelectedTool | null;
   eraseMode: boolean;
+  selectMode: boolean;
+  selectedKeys: Set<string>;
   rot: Rot;
   feedback: Feedback;
   focusTarget: FocusTarget;
@@ -46,6 +48,10 @@ type State = {
   renameTile: (x: number, y: number, name: string) => void;
   setSelected: (tool: SelectedTool | null) => void;
   setEraseMode: (enabled: boolean) => void;
+  setSelectMode: (enabled: boolean) => void;
+  toggleSelectKey: (x: number, y: number) => void;
+  clearSelectedKeys: () => void;
+  moveSelectedTiles: (dx: number, dy: number, replace: boolean) => void;
   cycleRot: () => void;
   clearAll: () => void;
   hydrateSnapshot: (snapshot: GameSnapshot) => void;
@@ -66,12 +72,47 @@ export const useGame = create<State>((set, get) => ({
   grid: new Map(),
   selected: { type: "road", kind: "straight" },
   eraseMode: false,
+  selectMode: false,
+  selectedKeys: new Set<string>(),
   rot: 0,
   feedback: null,
   focusTarget: null,
 
-  setSelected: (k) => set({ selected: k, eraseMode: false }),
-  setEraseMode: (enabled) => set({ eraseMode: enabled }),
+  setSelected: (k) => set({ selected: k, eraseMode: false, selectMode: false, selectedKeys: new Set() }),
+  setEraseMode: (enabled) => set({ eraseMode: enabled, selectMode: false, selectedKeys: new Set() }),
+  setSelectMode: (enabled) =>
+    set({ selectMode: enabled, eraseMode: false, selectedKeys: enabled ? new Set() : new Set() }),
+  toggleSelectKey: (x, y) => {
+    const { grid, selectedKeys } = get();
+    const k = cellKey(x, y);
+    if (!grid.has(k)) return;
+    const next = new Set(selectedKeys);
+    if (next.has(k)) next.delete(k);
+    else next.add(k);
+    set({ selectedKeys: next });
+  },
+  clearSelectedKeys: () => set({ selectedKeys: new Set() }),
+  moveSelectedTiles: (dx, dy, replace) => {
+    const { grid, selectedKeys, maps, activeMapId } = get();
+    if (selectedKeys.size === 0 || (dx === 0 && dy === 0)) return;
+    const next = new Map(grid);
+    const moved: Array<[string, Tile]> = [];
+    for (const k of selectedKeys) {
+      const t = next.get(k);
+      if (!t) continue;
+      moved.push([k, t]);
+      next.delete(k);
+    }
+    const newKeys = new Set<string>();
+    for (const [k, t] of moved) {
+      const [x, y] = k.split(",").map(Number);
+      const nk = cellKey(x + dx, y + dy);
+      if (next.has(nk) && !replace) continue;
+      next.set(nk, t);
+      newKeys.add(nk);
+    }
+    set({ grid: next, selectedKeys: newKeys, maps: syncGrid(maps, activeMapId, next) });
+  },
   setFocusTarget: (t) => set({ focusTarget: t }),
   cycleRot: () => set((s) => ({ rot: (((s.rot + 1) % 4) as Rot) })),
 
@@ -122,7 +163,7 @@ export const useGame = create<State>((set, get) => ({
   clearAll: () => {
     const { maps, activeMapId } = get();
     const empty: GridMap = new Map();
-    set({ grid: empty, maps: syncGrid(maps, activeMapId, empty) });
+    set({ grid: empty, maps: syncGrid(maps, activeMapId, empty), selectedKeys: new Set() });
   },
 
   hydrateSnapshot: (snapshot) => {
@@ -188,7 +229,7 @@ export const useGame = create<State>((set, get) => ({
     const saved = syncGrid(maps, activeMapId, grid);
     const target = saved.find((m) => m.id === id);
     if (!target) return;
-    set({ maps: saved, activeMapId: id, grid: new Map(target.grid) });
+    set({ maps: saved, activeMapId: id, grid: new Map(target.grid), selectedKeys: new Set() });
   },
 
   logout: () => {
@@ -203,6 +244,8 @@ export const useGame = create<State>((set, get) => ({
       grid: new Map(),
       selected: { type: "road", kind: "straight" },
       eraseMode: false,
+      selectMode: false,
+      selectedKeys: new Set(),
       rot: 0,
       feedback: null,
     });
