@@ -1,4 +1,5 @@
 import { AuthControls } from "@/components/AuthControls";
+import { FeedbackButton } from "@/components/FeedbackButton";
 
 interface HeaderProps {
   onSettingsOpen: () => void;
@@ -8,28 +9,35 @@ interface HeaderProps {
 export function Header({ onSettingsOpen, cityName }: HeaderProps) {
   return (
     <header className="w-full bg-white/70 backdrop-blur-md border-b-2 border-asphalt-200">
-      <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Logo />
-          <div>
-            <div className="font-display font-extrabold text-xl text-asphalt-900 leading-none">ChowkCraft</div>
+          <div className="min-w-0">
+            <div className="font-display font-extrabold text-base sm:text-xl text-asphalt-900 leading-none truncate">
+              ChowkCraft
+            </div>
             {cityName ? (
-              <div className="text-[11px] text-asphalt-500 leading-none mt-0.5">
+              <div className="text-[10px] sm:text-[11px] text-asphalt-500 leading-none mt-0.5 truncate">
                 Building: <span className="font-bold text-asphalt-700">{cityName}</span>
               </div>
             ) : (
-              <div className="text-[11px] text-asphalt-500 leading-none mt-0.5">Desi city map maker</div>
+              <div className="text-[10px] sm:text-[11px] text-asphalt-500 leading-none mt-0.5 truncate hidden xs:block sm:block">
+                Desi city map maker
+              </div>
             )}
           </div>
         </div>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <FeedbackButton />
           <button
             onClick={onSettingsOpen}
-            className="px-3 py-1.5 rounded-full text-sm font-semibold transition text-asphalt-700 hover:bg-asphalt-100 flex items-center gap-1.5"
+            className="px-2.5 sm:px-3 py-1.5 rounded-full text-sm font-semibold transition text-asphalt-700 hover:bg-asphalt-100 flex items-center gap-1.5"
+            aria-label="Settings"
+            title="Settings"
           >
             <GearIcon />
-            Settings
+            <span className="hidden sm:inline">Settings</span>
           </button>
           <Pill active>Builder</Pill>
           <AuthControls />
@@ -42,7 +50,7 @@ export function Header({ onSettingsOpen, cityName }: HeaderProps) {
 function Pill({ children, active }: { children: React.ReactNode; active?: boolean }) {
   return (
     <button
-      className={`px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+      className={`hidden sm:inline-flex px-3 py-1.5 rounded-full text-sm font-semibold transition ${
         active
           ? "bg-marigold-500 text-asphalt-900 shadow-tile"
           : "text-asphalt-700 hover:bg-asphalt-100"
@@ -55,9 +63,9 @@ function Pill({ children, active }: { children: React.ReactNode; active?: boolea
 
 function Logo() {
   return (
-    <div className="relative flex h-12 w-12 items-center justify-center rounded-[18px] border-[3px] border-asphalt-900 bg-[#FFF7AD] shadow-[0_5px_0_#1E293B]">
-      <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-asphalt-900 bg-fuchsia-500" />
-      <svg width="38" height="38" viewBox="0 0 48 48" aria-hidden="true">
+    <div className="relative flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[14px] sm:rounded-[18px] border-[3px] border-asphalt-900 bg-[#FFF7AD] shadow-[0_4px_0_#1E293B] sm:shadow-[0_5px_0_#1E293B]">
+      <div className="absolute -right-1 -top-1 h-3 w-3 sm:h-4 sm:w-4 rounded-full border-2 border-asphalt-900 bg-fuchsia-500" />
+      <svg className="h-7 w-7 sm:h-[38px] sm:w-[38px]" viewBox="0 0 48 48" aria-hidden="true">
         <defs>
           <linearGradient id="logoRoad" x1="0" x2="1" y1="0" y2="1">
             <stop stopColor="#475569" />

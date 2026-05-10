@@ -24,7 +24,7 @@ export function AuthControls() {
       <button
         type="button"
         disabled
-        className="ml-3 rounded-xl bg-asphalt-200 text-asphalt-500 font-bold px-4 py-2 shadow-pop"
+        className="ml-1 sm:ml-3 rounded-xl bg-asphalt-200 text-asphalt-500 font-bold px-3 sm:px-4 py-1.5 sm:py-2 text-sm shadow-pop"
       >
         Loading
       </button>
@@ -36,7 +36,7 @@ export function AuthControls() {
       <button
         type="button"
         onClick={() => void signIn("google", { callbackUrl: "/" })}
-        className="ml-3 rounded-xl bg-asphalt-900 text-white font-bold px-4 py-2 shadow-pop hover:bg-asphalt-700 active:translate-y-0.5"
+        className="ml-1 sm:ml-3 rounded-xl bg-asphalt-900 text-white font-bold px-3 sm:px-4 py-1.5 sm:py-2 text-sm shadow-pop hover:bg-asphalt-700 active:translate-y-0.5"
       >
         Sign in
       </button>
@@ -53,14 +53,14 @@ export function AuthControls() {
       : "Drive ready";
 
   return (
-    <div className="ml-3 flex items-center gap-2">
-      <div className="rounded-full border-2 border-asphalt-200 bg-white px-3 py-1 text-xs font-extrabold text-asphalt-700">
+    <div className="ml-1 sm:ml-3 flex items-center gap-1.5 sm:gap-2">
+      <div className="hidden md:block rounded-full border-2 border-asphalt-200 bg-white px-3 py-1 text-xs font-extrabold text-asphalt-700">
         {label}
       </div>
       <button
         type="button"
         onClick={() => void signOut({ callbackUrl: "/" })}
-        className="rounded-xl bg-asphalt-900 text-white font-bold px-4 py-2 shadow-pop hover:bg-asphalt-700 active:translate-y-0.5"
+        className="max-w-[120px] truncate rounded-xl bg-asphalt-900 text-white font-bold px-3 sm:px-4 py-1.5 sm:py-2 text-sm shadow-pop hover:bg-asphalt-700 active:translate-y-0.5"
         title={session.user.email ?? session.user.name ?? "Signed in"}
       >
         {session.user.name ?? "Sign out"}
