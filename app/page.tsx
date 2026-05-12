@@ -32,7 +32,7 @@ export default function Page() {
       {/* Floating palette */}
       <div className="absolute left-4 z-20 flex items-start gap-2" style={{ top: 76 }}>
         {paletteOpen && (
-          <div className="overflow-hidden" style={{ height: "calc(100vh - 90px)" }}>
+          <div className="overflow-hidden" style={{ height: "calc(100vh - 208px)", maxWidth: "calc(100vw - 82px)" }}>
             <RoadPalette />
           </div>
         )}
