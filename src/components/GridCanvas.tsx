@@ -53,6 +53,14 @@ export function GridCanvas() {
   const [camera, setCamera] = useState({ x: -6, y: -4 });
   const [zoom, setZoom] = useState(1);
   const [moving, setMoving] = useState(false);
+  const [replacePrompt, setReplacePrompt] = useState<{
+    kind: "place" | "move";
+    x: number;
+    y: number;
+    existingLabel: string;
+    nextLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const selectionAnchor = (() => {
     if (selectedKeys.size === 0) return null;
@@ -209,14 +217,21 @@ export function GridCanvas() {
     });
   };
 
-  const confirmReplaceTile = (x: number, y: number) => {
-    if (!selected) return false;
+  const tryPlaceTile = (x: number, y: number) => {
+    if (!selected) return;
     const existing = grid.get(cellKey(x, y));
-    if (!existing) return true;
-
-    return window.confirm(
-      `Replace ${getTileLabel(existing)} with ${getSelectedToolLabel(selected)}?`
-    );
+    if (!existing) {
+      placeTile(x, y);
+      return;
+    }
+    setReplacePrompt({
+      kind: "place",
+      x,
+      y,
+      existingLabel: getTileLabel(existing),
+      nextLabel: getSelectedToolLabel(selected),
+      onConfirm: () => placeTile(x, y),
+    });
   };
 
   const commitMove = (dx: number, dy: number) => {
@@ -236,10 +251,18 @@ export function GridCanvas() {
     if (collisions.length > 0) {
       const labels = collisions.slice(0, 5).map((c) => getTileLabel(c.tile)).join(", ");
       const more = collisions.length > 5 ? ` and ${collisions.length - 5} more` : "";
-      const ok = window.confirm(
-        `Do you want to replace the items below moving group of items?\n\n${collisions.length} tile(s): ${labels}${more}`
-      );
-      if (!ok) return;
+      setReplacePrompt({
+        kind: "move",
+        x: dx,
+        y: dy,
+        existingLabel: `${collisions.length} tile(s): ${labels}${more}`,
+        nextLabel: "moving group",
+        onConfirm: () => {
+          moveSelectedTiles(dx, dy, true);
+          setMoving(false);
+        },
+      });
+      return;
     }
     moveSelectedTiles(dx, dy, true);
     setMoving(false);
@@ -288,8 +311,7 @@ export function GridCanvas() {
           return;
         }
         if (!selected) return;
-        if (!confirmReplaceTile(c.x, c.y)) return;
-        placeTile(c.x, c.y);
+        tryPlaceTile(c.x, c.y);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -312,8 +334,7 @@ export function GridCanvas() {
         if (selectMode) return;
         const c = cellAt(e.clientX, e.clientY);
         if (!c) return;
-        if (!confirmReplaceTile(c.x, c.y)) return;
-        placeTile(c.x, c.y);
+        tryPlaceTile(c.x, c.y);
       }}
       onWheel={(e) => {
         e.preventDefault();
@@ -572,6 +593,60 @@ export function GridCanvas() {
       <div className="absolute bottom-3 right-3 rounded-full border-2 border-asphalt-900 bg-white/80 px-3 py-1 text-[11px] font-bold text-asphalt-700 backdrop-blur">
         Right-click tile to rotate | Right-click + drag to pan | Mouse wheel to zoom
       </div>
+
+      {replacePrompt && (
+        <div
+          className="absolute inset-0 z-40 grid place-items-center bg-asphalt-900/40 backdrop-blur-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setReplacePrompt(null);
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div
+            className="w-[320px] max-w-[92%] rounded-2xl border-[3px] border-asphalt-900 bg-white p-5 shadow-pop"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="font-display text-base font-extrabold text-asphalt-950">
+              {replacePrompt.kind === "place" ? "Replace this tile?" : "Replace tiles below moving group?"}
+            </div>
+            <div className="mt-2 text-[13px] leading-snug text-asphalt-700">
+              {replacePrompt.kind === "place" ? (
+                <>
+                  Replace <span className="font-bold text-asphalt-900">{replacePrompt.existingLabel}</span> with{" "}
+                  <span className="font-bold text-asphalt-900">{replacePrompt.nextLabel}</span>?
+                </>
+              ) : (
+                <>
+                  This will overwrite{" "}
+                  <span className="font-bold text-asphalt-900">{replacePrompt.existingLabel}</span> with the moving group.
+                </>
+              )}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const fn = replacePrompt.onConfirm;
+                  setReplacePrompt(null);
+                  fn();
+                }}
+                className="flex-1 rounded-xl border-2 border-asphalt-900 bg-lime-300 px-3 py-2 text-sm font-extrabold text-asphalt-950 shadow-tile hover:-translate-y-0.5 active:translate-y-0 transition"
+              >
+                Yes, replace
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplacePrompt(null)}
+                className="flex-1 rounded-xl border-2 border-asphalt-900 bg-white px-3 py-2 text-sm font-bold text-asphalt-900 hover:bg-rose-100"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
