@@ -194,12 +194,6 @@ export function RoadPalette() {
       >
         {eraseMode ? "Eraser On" : "Eraser Off"}
       </button>
-
-      <div className="mt-2 text-[10px] text-asphalt-500 leading-snug shrink-0">
-        <div>- Left-click to place tiles</div>
-        <div>- Turn on Eraser mode, then left-click a tile to remove</div>
-        <div>- Right-click tile to rotate, right-click + drag to pan</div>
-      </div>
     </aside>
   );
 }
